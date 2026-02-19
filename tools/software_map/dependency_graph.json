@@ -7,17 +7,13 @@
           "category": "DevOps Tools",
           "file": "features/cdd_status_monitor.md",
           "label": "Tool: CDD Monitor",
-          "prerequisites": [
-            "HOW_WE_WORK.md"
-          ]
+          "prerequisites": []
         },
         {
           "category": "DevOps Tools",
           "file": "features/software_map_generator.md",
           "label": "Tool: Software Map",
-          "prerequisites": [
-            "HOW_WE_WORK.md"
-          ]
+          "prerequisites": []
         }
       ]
     },
@@ -27,21 +23,22 @@
           "category": "DevOps Tools",
           "file": "features/cdd_status_monitor.md",
           "label": "Tool: CDD Monitor",
-          "prerequisites": [
-            "HOW_WE_WORK.md"
-          ]
+          "prerequisites": []
         },
         {
           "category": "DevOps Tools",
           "file": "features/software_map_generator.md",
           "label": "Tool: Software Map",
-          "prerequisites": [
-            "HOW_WE_WORK.md"
-          ]
+          "prerequisites": []
         }
       ]
     }
   },
-  "generated_at": "2026-02-19T02:58:39Z",
-  "orphans": []
+  "generated_at": "2026-02-19T02:59:59Z",
+  "orphans": [
+    "cdd_status_monitor.md",
+    "cdd_status_monitor.md",
+    "software_map_generator.md",
+    "software_map_generator.md"
+  ]
 }

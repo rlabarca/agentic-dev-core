@@ -62,8 +62,6 @@ flowchart TD
     end
 
     %% Relationships
-    HOW_WE_WORK["HOW_WE_WORK?"] -.-> cdd_status_monitor
-    HOW_WE_WORK["HOW_WE_WORK?"] -.-> software_map_generator
 
     %% Styling Definitions
     classDef default fill:#e1f5fe,stroke:#01579b,stroke-width:1px,color:black;
