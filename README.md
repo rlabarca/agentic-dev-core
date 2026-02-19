@@ -124,10 +124,14 @@ flowchart TD
         title_DevOps_Tools ~~~ cdd_status_monitor
         software_map_generator["Tool: Software Map<br/><small>software_map_generator.md</small>"]
         title_DevOps_Tools ~~~ software_map_generator
+    end
+
+    subgraph Initialization_&_Update [" "]
+        title_Initialization_&_Update["INITIALIZATION & UPDATE"]
         submodule_bootstrap["Tool: Bootstrap<br/><small>submodule_bootstrap.md</small>"]
-        title_DevOps_Tools ~~~ submodule_bootstrap
+        title_Initialization_&_Update ~~~ submodule_bootstrap
         submodule_sync["Tool: Upstream Sync<br/><small>submodule_sync.md</small>"]
-        title_DevOps_Tools ~~~ submodule_sync
+        title_Initialization_&_Update ~~~ submodule_sync
     end
 
     %% Relationships
@@ -143,6 +147,7 @@ flowchart TD
 
     %% Style Applications
     class title_DevOps_Tools subgraphTitle;
+    class title_Initialization_&_Update subgraphTitle;
 ```
 <!-- MERMAID_END -->
 

@@ -1,7 +1,7 @@
 # Feature: Submodule Bootstrap
 
 > Label: "Tool: Bootstrap"
-> Category: "DevOps Tools"
+> Category: "Initialization & Update"
 > Prerequisite: HOW_WE_WORK.md (Section 6: Layered Instruction Architecture)
 
 ## 1. Overview

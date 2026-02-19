@@ -1,7 +1,7 @@
 # Feature: Submodule Upstream Sync
 
 > Label: "Tool: Upstream Sync"
-> Category: "DevOps Tools"
+> Category: "Initialization & Update"
 > Prerequisite: features/submodule_bootstrap.md
 
 ## 1. Overview
