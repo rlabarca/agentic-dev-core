@@ -112,6 +112,16 @@
         let isInitialLoad = true;
         let refreshTimer = null;
 
+        // -- SVG Label Generator (dual-size typography) --
+        function createNodeLabelSVG(name, filename) {
+            const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="44">' +
+                '<text x="100" y="18" text-anchor="middle" font-size="14" font-weight="bold" fill="#E8E8E8" font-family="Menlo,Monaco,Consolas,monospace">' + esc(name) + '</text>' +
+                '<text x="100" y="36" text-anchor="middle" font-size="9" fill="#888" font-family="Menlo,Monaco,Consolas,monospace">' + esc(filename) + '</text>' +
+                '</svg>';
+            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        }
+
         // Category color palette
         const CATEGORY_COLORS = {
             'DevOps Tools': '#0288d1',
@@ -201,15 +211,18 @@
                 const color = CATEGORY_COLORS[f.category] || DEFAULT_NODE_COLOR;
                 const catId = 'cat_' + f.category.replace(/[^a-zA-Z0-9]/g, '_');
                 const filename = f.file.split('/').pop();
+                const svgLabel = createNodeLabelSVG(f.label, filename);
                 nodes.push({
                     data: {
                         id: id,
-                        label: f.label + '\n' + filename,
+                        friendlyName: f.label,
+                        filename: filename,
                         file: f.file,
                         category: f.category,
                         prerequisites: f.prerequisites || [],
                         color: color,
                         parent: catId,
+                        svgLabel: svgLabel,
                     }
                 });
 
@@ -238,20 +251,17 @@
                     {
                         selector: 'node[!isCategory]',
                         style: {
-                            'label': 'data(label)',
+                            'label': '',
+                            'shape': 'round-rectangle',
+                            'width': 220,
+                            'height': 56,
                             'background-color': 'data(color)',
-                            'color': '#CCC',
-                            'font-size': '9px',
-                            'font-family': "'Menlo','Monaco','Consolas', monospace",
-                            'text-valign': 'bottom',
-                            'text-margin-y': 6,
-                            'width': 28,
-                            'height': 28,
+                            'background-opacity': 0.15,
+                            'background-image': 'data(svgLabel)',
+                            'background-fit': 'contain',
                             'border-width': 2,
-                            'border-color': '#2A2F36',
-                            'text-wrap': 'wrap',
-                            'text-max-width': '140px',
-                            'text-halign': 'center',
+                            'border-color': 'data(color)',
+                            'border-opacity': 0.6,
                         }
                     },
                     {
@@ -264,12 +274,12 @@
                             'border-color': '#2A2F36',
                             'border-style': 'dashed',
                             'color': '#666',
-                            'font-size': '11px',
+                            'font-size': '12px',
                             'font-weight': 'bold',
                             'text-valign': 'top',
                             'text-halign': 'center',
-                            'text-margin-y': -6,
-                            'padding': '16px',
+                            'text-margin-y': -8,
+                            'padding': '24px',
                             'shape': 'round-rectangle',
                         }
                     },
@@ -287,20 +297,20 @@
                     {
                         selector: 'node.highlighted',
                         style: {
-                            'background-color': '#FF7043',
                             'border-color': '#FF7043',
                             'border-width': 3,
-                            'color': '#FFF',
+                            'border-opacity': 1,
+                            'background-opacity': 0.3,
                             'z-index': 10,
                         }
                     },
                     {
                         selector: 'node.center-hover',
                         style: {
-                            'background-color': '#FFF',
                             'border-color': '#4FC3F7',
                             'border-width': 3,
-                            'color': '#FFF',
+                            'border-opacity': 1,
+                            'background-opacity': 0.35,
                             'z-index': 11,
                         }
                     },
@@ -341,9 +351,9 @@
                 layout: {
                     name: 'dagre',
                     rankDir: 'TB',
-                    nodeSep: 60,
-                    rankSep: 80,
-                    padding: 40,
+                    nodeSep: 80,
+                    rankSep: 100,
+                    padding: 50,
                 },
                 wheelSensitivity: 0.3,
                 minZoom: 0.1,
@@ -372,7 +382,7 @@
             // -- Click for detail modal (feature nodes only) --
             instance.on('tap', 'node[!isCategory]', function(evt) {
                 const file = evt.target.data('file');
-                const label = evt.target.data('label');
+                const label = evt.target.data('friendlyName');
                 if (file) openModal(file, label);
             });
 
@@ -394,9 +404,10 @@
             }
 
             cy.nodes().forEach(node => {
-                const label = (node.data('label') || '').toLowerCase();
+                const name = (node.data('friendlyName') || node.data('label') || '').toLowerCase();
                 const file = (node.data('file') || '').toLowerCase();
-                if (label.includes(query) || file.includes(query)) {
+                const filename = (node.data('filename') || '').toLowerCase();
+                if (name.includes(query) || file.includes(query) || filename.includes(query)) {
                     node.removeClass('search-hidden');
                 } else {
                     node.addClass('search-hidden');
