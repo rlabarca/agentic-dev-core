@@ -5,13 +5,25 @@ Your mandate is to translate specifications into high-quality code and **commit 
 *   **Application Specs (`features/`):** Target the primary product.
 *   **Agentic Specs (`./features/`):** Target the workflow tools in `tools/`. Tests MUST be colocated in the tool directory. **NEVER** place DevOps tests in the project's root test folder.
 
-## 2. My Unbreakable Implementation & Commit Protocol
+## 2. Feature Status Lifecycle
+The CDD Monitor tracks every feature through three states. Status is driven entirely by **git commit tags** and **file modification timestamps**.
+
+| CDD State | Git Commit Tag | Meaning |
+|---|---|---|
+| **TODO** | *(default)* | Feature has no status commit, or the feature file was modified after its last status commit. |
+| **TESTING** | `[Ready for Verification features/FILENAME.md]` | Implementation and local tests pass. Awaiting human or final verification. |
+| **COMPLETE** | `[Complete features/FILENAME.md]` | All verification passed. Feature is done. |
+
+**Critical Rule:** Any edit to a feature file (including adding Implementation Notes) resets its status to **TODO**. You MUST plan your commits so that the status tag commit is always the **last** commit touching that feature file.
+
+## 3. My Unbreakable Implementation & Commit Protocol
 
 ### 0. Pre-Flight Checks (MANDATORY)
 *   **Identify Domain:** Determine if you are in Application or Agentic context.
 *   **Consult the Architecture:** Read the relevant `features/arch_*.md` (Application or Agentic).
 *   **Consult the Feature's Knowledge Base:** Read the `## Implementation Notes` section at the bottom of the feature file and its prerequisites.
 *   **Check for Dependencies:** Read `tools/software_map/dependency_graph.json` to verify prerequisites and their status before proceeding. Do NOT use the web UI for dependency checks.
+*   **Verify Current Status:** Read `tools/cdd/feature_status.json` and confirm the target feature is in the expected state (typically `todo`). Do NOT use the web dashboard.
 
 ### 1. Acknowledge and Plan
 *   State which feature file you are implementing.
@@ -21,6 +33,7 @@ Your mandate is to translate specifications into high-quality code and **commit 
 *   Write the code and unit tests.
 *   **Knowledge Colocation:** If you encounter a non-obvious problem, discover critical behavior, or make a significant design decision, you MUST add a concise entry to the `## Implementation Notes` section at the bottom of the **feature file itself**.
 *   **Architectural Escalation:** If a discovery affects a global rule, you MUST update the relevant `arch_*.md` file. This ensures the "Constitution" remains accurate. Do NOT create separate log files.
+*   **Commit Implementation Work:** Stage and commit all implementation code, tests, AND any feature file edits (Implementation Notes) together: `git commit -m "feat(scope): implement FEATURE_NAME"`. This commit does NOT include a status tag — it is a work commit. The feature remains in **TODO** after this commit.
 
 ### 3. Verify Locally
 *   **Domain-Specific Testing (MANDATORY):**
@@ -28,20 +41,22 @@ Your mandate is to translate specifications into high-quality code and **commit 
     *   **Agentic Context:** **DO NOT** use global application test scripts. You MUST identify or create a local test runner within the tool's directory.
     *   **Reporting Protocol:** Every DevOps test run MUST produce a `test_status.json` in the tool's folder with `{"status": "PASS", ...}`.
     *   **Zero Pollution:** Ensure that testing a DevOps tool does not trigger builds or unit tests for the target application.
+*   **If tests fail:** Fix the issue and repeat from Step 2. Do NOT proceed to Step 4 with failing tests.
 
-### 4. Commit the Work
-*   **A. Stage changes:** `git add .`
-*   **B. Determine Status Tag:**
-    *   If the file has a manual verification section: `[Ready for Verification features/FILENAME.md]`
-    *   Otherwise: `[Complete features/FILENAME.md]`
-*   **C. Execute Commit:** `git commit -m "feat(scope): description <TAG>"`
+### 4. Commit the Status Tag (SEPARATE COMMIT)
+This commit transitions the feature out of **TODO**. It MUST be a **separate commit** from the implementation work in Step 2 to ensure the status tag is the latest commit referencing this feature file.
 
-## 3. Agentic Team Orchestration
+*   **A. Determine Status Tag:**
+    *   If the feature requires manual/human verification: `[Ready for Verification features/FILENAME.md]` (transitions to **TESTING**)
+    *   If all verification is automated and passing: `[Complete features/FILENAME.md]` (transitions to **COMPLETE**)
+*   **B. Execute Status Commit:** `git commit --allow-empty -m "status(scope): TAG"`
+*   **C. Verify Transition:** Read `tools/cdd/feature_status.json` and confirm the feature now appears in the expected state (`testing` or `complete`). Do NOT use the web dashboard. If the status did not update as expected, investigate and correct before moving on.
+
+## 4. Agentic Team Orchestration
 1.  **Orchestration Mandate:** You are encouraged to act as a "Lead Developer." When faced with a complex task, you SHOULD delegate sub-tasks to specialized sub-agents to ensure maximum accuracy and efficiency.
 2.  **Specialized Persona:** You may explicitly "spawn" internal personas for specific implementation stages (e.g., "The Critic" for review) to improve quality.
 3.  **Efficiency:** Use delegation to break down monolithic tasks into smaller, verifiable units.
 
-## 4. Build & Environment Protocols
+## 5. Build & Environment Protocols
 *   **Build Environment:** Follow the project's build and environment configuration.
 *   **Deployment/Execution:** NEVER perform high-risk operations (e.g., flashing hardware, production deployment) yourself. Prepare the artifacts, then inform the User and provide the specific command for them to run.
-*   **Status Reset:** Any edit to a feature file resets it to `[TODO]`. You must re-verify and create a new status commit to clear it. Confirm status by reading `tools/cdd/feature_status.json`. Do NOT use the web dashboard for status checks.
