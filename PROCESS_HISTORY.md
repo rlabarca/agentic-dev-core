@@ -2,6 +2,12 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-18] Colocate HOW_WE_WORK.md into .agentic_devops/
+- **Change:** Moved `HOW_WE_WORK.md` from project root into `.agentic_devops/HOW_WE_WORK.md`. Added a copy to `agentic_devops.sample/` for distribution to adopting projects.
+- **Rationale:** All workflow-defining artifacts (role instructions, config, and now the process philosophy) are colocated in a single distributable folder. This prepares the framework for clean adoption by external projects.
+- **Reference Updates:** Updated path references in `.agentic_devops/ARCHITECT_INSTRUCTIONS.md` (Context Clear Protocol, Process History Purity, Feature Scope Restriction), `agentic_devops.sample/ARCHITECT_INSTRUCTIONS.md` (Context Clear Protocol, Process History Purity), and `README.md` (Directory Structure).
+- **Sample Sync Coverage:** The existing "Sample Sync Prompt" rule (Architect item 6) already covers any file inside `.agentic_devops/`, so HOW_WE_WORK.md is now automatically included in that mandate.
+
 ## [2026-02-18] Remove Dual-Domain Separation (Single-Project Simplification)
 - **Problem:** The CDD Monitor and Software Map specs carried a dual-domain model ("Application" vs "Agentic Core") with a "Meta Mode" workaround for when both domains pointed to the same `features/` directory. With agentic-dev-core tracked as its own standalone project, this separation was vestigial complexity.
 - **Spec Changes:**

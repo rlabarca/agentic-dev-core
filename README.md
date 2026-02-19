@@ -45,7 +45,7 @@ Instead of separate documentation or global logs, implementation discoveries, ha
 *   `tools/`: Python-based DevOps tools that support the workflow (CDD Monitor, Software Map, etc.).
 *   `ARCHITECT_INSTRUCTIONS.md`: The "Constitution" for the Architect role.
 *   `BUILDER_INSTRUCTIONS.md`: The "Protocol" for the Builder role.
-*   `HOW_WE_WORK.md`: The high-level philosophy and lifecycle.
+*   `.agentic_devops/HOW_WE_WORK.md`: The high-level philosophy and lifecycle.
 
 ## Feature Map
 <!-- MERMAID_START -->

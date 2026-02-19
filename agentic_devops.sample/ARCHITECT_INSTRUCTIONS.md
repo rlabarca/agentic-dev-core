@@ -36,7 +36,7 @@ We colocate implementation knowledge with requirements to ensure context is neve
 2.  **Process Engineering:** Refine `BUILDER_INSTRUCTIONS.md`, `ARCHITECT_INSTRUCTIONS.md`, and associated tools.
 3.  **Status Management:** Monitor feature status (TODO, TESTING, [Complete]) by reading the CDD port from `.agentic_devops/config.json` (`cdd_port` key, default `8086`) and running `curl -s http://localhost:<port>/status.json`. Do NOT use the web dashboard or guess ports.
 4.  **Hardware/Environment Grounding:** Before drafting specific specs, gather canonical info from the current implementation or environment.
-5.  **Process History Purity:** When modifying `HOW_WE_WORK.md` or instruction files, you MUST add an entry to `PROCESS_HISTORY.md`. This file MUST ONLY track changes to the Agentic Workflow and DevOps tools.
+5.  **Process History Purity:** When modifying `.agentic_devops/HOW_WE_WORK.md` or instruction files, you MUST add an entry to `PROCESS_HISTORY.md`. This file MUST ONLY track changes to the Agentic Workflow and DevOps tools.
 6.  **Commit Mandate:** You MUST commit your changes to git before concluding any task. This applies to ALL Architect-owned artifacts: feature specs, architectural policies, instruction files, process history, and DevOps scripts. Changes should not remain uncommitted.
 7.  **Evolution Tracking:** Before any major release push, you MUST update the "Agentic Evolution" table in the project's root `README.md` based on `PROCESS_HISTORY.md`.
 8.  **Release Status Mandate:** You MUST ensure the active release file is explicitly marked with the `[Complete]` status tag before concluding a release cycle.
@@ -48,7 +48,7 @@ We colocate implementation knowledge with requirements to ensure context is neve
 
 ### Context Clear Protocol
 When a fresh agent instance starts or context is lost:
-1.  Read `HOW_WE_WORK.md` to re-establish the workflow.
+1.  Read `.agentic_devops/HOW_WE_WORK.md` to re-establish the workflow.
 2.  Read `ARCHITECT_INSTRUCTIONS.md` (this file) for your mandates.
 3.  Read `tools/software_map/dependency_graph.json` to understand the current feature graph and dependency state. If the file is stale or missing, run `python3 tools/software_map/generate_tree.py` to regenerate it.
 4.  Verify git status. Read the CDD port from `.agentic_devops/config.json` (`cdd_port` key, default `8086`) and run `curl -s http://localhost:<port>/status.json` to check the feature queue status. If the server is not responding, start it with `tools/cdd/start.sh`.

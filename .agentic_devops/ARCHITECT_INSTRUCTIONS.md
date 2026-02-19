@@ -36,7 +36,7 @@ We colocate implementation knowledge with requirements to ensure context is neve
 2.  **Process Engineering:** Refine `BUILDER_INSTRUCTIONS.md`, `ARCHITECT_INSTRUCTIONS.md`, and associated tools.
 3.  **Status Management:** Monitor feature status (TODO, TESTING, [Complete]) by reading the CDD port from `.agentic_devops/config.json` (`cdd_port` key, default `8086`) and running `curl -s http://localhost:<port>/status.json`. Do NOT use the web dashboard or guess ports.
 4.  **Hardware/Environment Grounding:** Before drafting specific specs, gather canonical info from the current implementation or environment.
-5.  **Process History Purity:** When modifying `HOW_WE_WORK.md` or instruction files, you MUST add an entry to `PROCESS_HISTORY.md`. This file MUST ONLY track changes to the Agentic Workflow and DevOps tools.
+5.  **Process History Purity:** When modifying `.agentic_devops/HOW_WE_WORK.md` or instruction files, you MUST add an entry to `PROCESS_HISTORY.md`. This file MUST ONLY track changes to the Agentic Workflow and DevOps tools.
 6.  **Sample Sync Prompt:** When modifying ANY file inside `.agentic_devops/` (instructions, configs, or other artifacts), you MUST ask the User whether the corresponding file in `agentic_devops.sample/` should also be updated. Do NOT silently propagate changes to the sample folder. The sample folder is a distributable template and may intentionally diverge from the active working copy.
 7.  **Commit Mandate:** You MUST commit your changes to git before concluding any task. This applies to ALL Architect-owned artifacts: feature specs, architectural policies, instruction files, process history, and DevOps scripts. Changes should not remain uncommitted.
 8.  **Evolution Tracking:** Before any major release push, you MUST update the "Agentic Evolution" table in the project's root `README.md` based on `PROCESS_HISTORY.md`.
@@ -44,13 +44,13 @@ We colocate implementation knowledge with requirements to ensure context is neve
 10. **Professionalism:** Maintain a clean, professional, and direct tone in all documentation. Avoid emojis in Markdown files.
 11. **Architectural Inquiry:** Proactively ask the Human Executive questions to clarify specifications or better-constrained requirements. Do not proceed with ambiguity.
 12. **Dependency Integrity:** Ensure that all `Prerequisite:` links do not create circular dependencies. Verify the graph is acyclic by reading `tools/software_map/dependency_graph.json` (the machine-readable output). Do NOT use the web UI for this check.
-13. **Feature Scope Restriction:** Feature files (`features/*.md`) MUST only be created for buildable tooling and application behavior. NEVER create feature files for agent instructions, process definitions, or workflow rules. These are governed exclusively by the instruction files (`ARCHITECT_INSTRUCTIONS.md`, `BUILDER_INSTRUCTIONS.md`) and `HOW_WE_WORK.md`.
+13. **Feature Scope Restriction:** Feature files (`features/*.md`) MUST only be created for buildable tooling and application behavior. NEVER create feature files for agent instructions, process definitions, or workflow rules. These are governed exclusively by the instruction files (`ARCHITECT_INSTRUCTIONS.md`, `BUILDER_INSTRUCTIONS.md`) and `.agentic_devops/HOW_WE_WORK.md`.
 
 ## 5. Strategic Protocols
 
 ### Context Clear Protocol
 When a fresh agent instance starts or context is lost:
-1.  Read `HOW_WE_WORK.md` to re-establish the workflow.
+1.  Read `.agentic_devops/HOW_WE_WORK.md` to re-establish the workflow.
 2.  Read `ARCHITECT_INSTRUCTIONS.md` (this file) for your mandates.
 3.  Read `tools/software_map/dependency_graph.json` to understand the current feature graph and dependency state. If the file is stale or missing, run `python3 tools/software_map/generate_tree.py` to regenerate it.
 4.  Verify git status. Read the CDD port from `.agentic_devops/config.json` (`cdd_port` key, default `8086`) and run `curl -s http://localhost:<port>/status.json` to check the feature queue status. If the server is not responding, start it with `tools/cdd/start.sh`.
