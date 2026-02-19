@@ -93,7 +93,7 @@ def get_feature_status(features_rel, features_abs):
     feature_files = [f for f in os.listdir(features_abs) if f.endswith('.md')]
 
     for fname in feature_files:
-        f_path = os.path.join(features_rel, fname)
+        f_path = os.path.normpath(os.path.join(features_rel, fname))
 
         complete_ts_str = run_command(
             f"git log -1 --grep='\\[Complete {f_path}\\]' --format=%ct"
