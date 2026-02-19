@@ -1,10 +1,12 @@
 # Agentic DevOps Core
 
-A project-agnostic, spec-driven development framework for AI-collaborative software engineering.
+**A Deterministic AI-Driven Engineering (DAE) framework.**
+
+DAE is a development methodology where AI agents operate under deterministic, spec-driven constraints rather than probabilistic guesswork. The core thesis: if specifications are rigorous enough, any compliant agent can rebuild the entire system from scratch -- making code truly disposable and specifications the only permanent artifact.
 
 ## Overview
 
-Agentic DevOps Core is a workflow engine designed to maximize the effectiveness of LLM-based agents (Architects and Builders) in the software development lifecycle. It operates on the core principle that **"Code is Disposable, but Specifications are Eternal."**
+Agentic DevOps Core is the reference implementation of DAE. It is a project-agnostic workflow engine designed to maximize the effectiveness of LLM-based agents (Architects and Builders) in the software development lifecycle. It operates on the core principle that **"Code is Disposable, but Specifications are Eternal."**
 
 By colocating technical implementation knowledge with behavioral specifications (Gherkin), the framework ensures that system context is never lost and that codebases can be reliably rebuilt or refactored by AI agents with minimal human intervention.
 
