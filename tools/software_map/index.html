@@ -82,13 +82,6 @@
             border-left: 3px solid #0288d1; padding-left: 10px;
             color: #888; margin: 6px 0;
         }
-        .legend {
-            position: fixed; bottom: 10px; right: 10px;
-            background: #1A2028; border: 1px solid #2A2F36;
-            border-radius: 4px; padding: 8px 10px; font-size: 10px; z-index: 100;
-        }
-        .legend-item { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
-        .legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
     </style>
 </head>
 <body>
@@ -111,11 +104,6 @@
         </div>
     </div>
 
-    <div class="legend">
-        <div class="legend-item"><div class="legend-swatch" style="background:#4FC3F7"></div> Feature node</div>
-        <div class="legend-item"><div class="legend-swatch" style="background:#FF7043"></div> Highlighted neighbor</div>
-        <div class="legend-item"><div class="legend-swatch" style="background:#333"></div> De-emphasized</div>
-    </div>
 
     <script>
         // -- State --
@@ -184,6 +172,7 @@
             const nodes = [];
             const edges = [];
             const fileToId = {};
+            const categories = new Set();
 
             // Build file-to-id map for edge resolution
             features.forEach(f => {
@@ -192,19 +181,35 @@
                 // Also map just the filename for prerequisite matching
                 const basename = f.file.split('/').pop();
                 fileToId[basename] = id;
+                categories.add(f.category);
+            });
+
+            // Create compound parent nodes for each category
+            categories.forEach(cat => {
+                const catId = 'cat_' + cat.replace(/[^a-zA-Z0-9]/g, '_');
+                nodes.push({
+                    data: {
+                        id: catId,
+                        label: cat,
+                        isCategory: true,
+                    }
+                });
             });
 
             features.forEach(f => {
                 const id = fileToId[f.file];
                 const color = CATEGORY_COLORS[f.category] || DEFAULT_NODE_COLOR;
+                const catId = 'cat_' + f.category.replace(/[^a-zA-Z0-9]/g, '_');
+                const filename = f.file.split('/').pop();
                 nodes.push({
                     data: {
                         id: id,
-                        label: f.label,
+                        label: f.label + '\n' + filename,
                         file: f.file,
                         category: f.category,
                         prerequisites: f.prerequisites || [],
                         color: color,
+                        parent: catId,
                     }
                 });
 
@@ -231,21 +236,41 @@
                 elements: [...elements.nodes, ...elements.edges],
                 style: [
                     {
-                        selector: 'node',
+                        selector: 'node[!isCategory]',
                         style: {
                             'label': 'data(label)',
                             'background-color': 'data(color)',
                             'color': '#CCC',
-                            'font-size': '10px',
+                            'font-size': '9px',
                             'font-family': "'Menlo','Monaco','Consolas', monospace",
                             'text-valign': 'bottom',
                             'text-margin-y': 6,
-                            'width': 30,
-                            'height': 30,
+                            'width': 28,
+                            'height': 28,
                             'border-width': 2,
                             'border-color': '#2A2F36',
                             'text-wrap': 'wrap',
-                            'text-max-width': '120px',
+                            'text-max-width': '140px',
+                            'text-halign': 'center',
+                        }
+                    },
+                    {
+                        selector: '$node > node',
+                        style: {
+                            'label': 'data(label)',
+                            'background-color': '#1A2028',
+                            'background-opacity': 0.8,
+                            'border-width': 1,
+                            'border-color': '#2A2F36',
+                            'border-style': 'dashed',
+                            'color': '#666',
+                            'font-size': '11px',
+                            'font-weight': 'bold',
+                            'text-valign': 'top',
+                            'text-halign': 'center',
+                            'text-margin-y': -6,
+                            'padding': '16px',
+                            'shape': 'round-rectangle',
                         }
                     },
                     {
@@ -325,25 +350,27 @@
                 maxZoom: 5,
             });
 
-            // -- Hover highlighting --
-            instance.on('mouseover', 'node', function(evt) {
+            // -- Hover highlighting (feature nodes only, not category parents) --
+            instance.on('mouseover', 'node[!isCategory]', function(evt) {
                 const node = evt.target;
                 const neighborhood = node.neighborhood().add(node);
 
                 instance.elements().addClass('dimmed');
+                // Keep category parents visible
+                instance.nodes('$node > node').removeClass('dimmed');
                 neighborhood.removeClass('dimmed');
 
                 node.addClass('center-hover');
-                neighborhood.nodes().not(node).addClass('highlighted');
+                neighborhood.nodes().not(node).filter('[!isCategory]').addClass('highlighted');
                 neighborhood.edges().addClass('highlighted');
             });
 
-            instance.on('mouseout', 'node', function() {
+            instance.on('mouseout', 'node[!isCategory]', function() {
                 instance.elements().removeClass('dimmed highlighted center-hover');
             });
 
-            // -- Click for detail modal --
-            instance.on('tap', 'node', function(evt) {
+            // -- Click for detail modal (feature nodes only) --
+            instance.on('tap', 'node[!isCategory]', function(evt) {
                 const file = evt.target.data('file');
                 const label = evt.target.data('label');
                 if (file) openModal(file, label);
