@@ -174,8 +174,33 @@ def get_feature_stem(filepath):
 # Spec Gate checks (Section 2.1)
 # ===================================================================
 
-def check_section_completeness(content, sections):
-    """Check that required sections exist."""
+def check_section_completeness(content, sections, policy_file=False):
+    """Check that required sections exist.
+
+    For policy files (arch_*.md), checks for Purpose and Invariants
+    instead of Overview/Requirements/Scenarios.
+    """
+    if policy_file:
+        has_purpose = any('purpose' in k for k in sections)
+        has_invariants = any('invariants' in k for k in sections)
+
+        if has_purpose and has_invariants:
+            return {
+                'status': 'PASS',
+                'detail': 'Required policy sections present (Purpose, Invariants).',
+            }
+
+        missing = []
+        if not has_purpose:
+            missing.append('Purpose')
+        if not has_invariants:
+            missing.append('Invariants')
+
+        return {
+            'status': 'FAIL',
+            'detail': f'Missing policy sections: {", ".join(missing)}.',
+        }
+
     has_overview = any('overview' in k for k in sections)
     has_requirements = any('requirements' in k for k in sections)
     has_scenarios = any('scenarios' in k for k in sections)
@@ -250,8 +275,8 @@ def check_policy_anchoring(content, filename):
         }
 
     return {
-        'status': 'FAIL',
-        'detail': 'No Prerequisite link defined.',
+        'status': 'WARN',
+        'detail': 'No prerequisite link found.',
     }
 
 
@@ -337,18 +362,34 @@ def check_gherkin_quality(scenarios):
 def run_spec_gate(content, filename, features_dir):
     """Run all Spec Gate checks.
 
-    Returns dict with 'status' and 'checks'.
+    Policy files (arch_*.md) receive reduced evaluation: only Purpose/Invariants
+    section check; scenario_classification and gherkin_quality are skipped.
     """
     sections = parse_sections(content)
     scenarios = parse_scenarios(content)
+    policy = is_policy_file(filename)
 
-    checks = {
-        'section_completeness': check_section_completeness(content, sections),
-        'scenario_classification': check_scenario_classification(scenarios),
-        'policy_anchoring': check_policy_anchoring(content, filename),
-        'prerequisite_integrity': check_prerequisite_integrity(content, features_dir),
-        'gherkin_quality': check_gherkin_quality(scenarios),
-    }
+    if policy:
+        checks = {
+            'section_completeness': check_section_completeness(
+                content, sections, policy_file=True),
+            'scenario_classification': {
+                'status': 'PASS', 'detail': 'N/A - policy file'},
+            'policy_anchoring': check_policy_anchoring(content, filename),
+            'prerequisite_integrity': check_prerequisite_integrity(
+                content, features_dir),
+            'gherkin_quality': {
+                'status': 'PASS', 'detail': 'N/A - policy file'},
+        }
+    else:
+        checks = {
+            'section_completeness': check_section_completeness(content, sections),
+            'scenario_classification': check_scenario_classification(scenarios),
+            'policy_anchoring': check_policy_anchoring(content, filename),
+            'prerequisite_integrity': check_prerequisite_integrity(
+                content, features_dir),
+            'gherkin_quality': check_gherkin_quality(scenarios),
+        }
 
     # Overall status = worst of individual checks
     statuses = [c['status'] for c in checks.values()]
@@ -597,6 +638,29 @@ def run_user_testing_audit(content):
 # Output generation
 # ===================================================================
 
+def _policy_exempt_implementation_gate():
+    """Return an Implementation Gate result for policy files (all PASS)."""
+    exempt = 'N/A - policy file exempt'
+    return {
+        'status': 'PASS',
+        'checks': {
+            'traceability': {
+                'status': 'PASS', 'coverage': 1.0, 'detail': exempt},
+            'policy_adherence': {
+                'status': 'PASS', 'violations': [], 'detail': exempt},
+            'structural_completeness': {
+                'status': 'PASS', 'detail': exempt},
+            'builder_decisions': {
+                'status': 'PASS',
+                'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                            'DEVIATION': 0, 'DISCOVERY': 0},
+                'detail': exempt},
+            'logic_drift': {
+                'status': 'PASS', 'pairs': [], 'detail': exempt},
+        },
+    }
+
+
 def generate_critic_json(feature_path):
     """Analyze a single feature and return the critic.json data structure."""
     content = read_feature_file(feature_path)
@@ -604,7 +668,12 @@ def generate_critic_json(feature_path):
     feature_stem = get_feature_stem(feature_path)
 
     spec_gate = run_spec_gate(content, filename, FEATURES_DIR)
-    impl_gate = run_implementation_gate(content, feature_stem, filename)
+
+    if is_policy_file(filename):
+        impl_gate = _policy_exempt_implementation_gate()
+    else:
+        impl_gate = run_implementation_gate(content, feature_stem, filename)
+
     user_testing = run_user_testing_audit(content)
 
     rel_path = os.path.relpath(feature_path, PROJECT_ROOT)

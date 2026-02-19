@@ -221,36 +221,38 @@ def get_last_commit():
     return run_command("git log -1 --format='%h %s (%cr)'")
 
 
-def _test_badge_html(feature_stem):
-    """Returns an HTML badge for per-feature test status, or empty string."""
-    ts = get_feature_test_status(feature_stem, TESTS_DIR)
-    if ts is None:
-        return ""
-    css = "st-pass" if ts == "PASS" else "st-fail"
-    return f' <span class="{css}">[{ts}]</span>'
-
-
-def _critic_badge_html(feature_stem):
-    """Returns an HTML badge for per-feature critic status, or empty string."""
-    cs = get_feature_critic_status(feature_stem, TESTS_DIR)
-    if cs is None:
+def _badge_html(status, label=None):
+    """Returns a colored badge span, or empty string if status is None."""
+    if status is None:
         return ""
     css_map = {"PASS": "st-pass", "WARN": "st-warn", "FAIL": "st-fail"}
-    css = css_map.get(cs, "st-fail")
-    return f' <span class="{css}">[CRITIC: {cs}]</span>'
+    css = css_map.get(status, "st-fail")
+    text = label or status
+    return f'<span class="{css}">{text}</span>'
 
 
-def _feature_list_html(features, css_class):
-    """Renders a <ul> of feature names with status squares and test badges."""
+def _feature_table_html(features, css_class):
+    """Renders a table of features with Test and Critic badge columns."""
     if not features:
         return ""
-    items = ''.join(
-        f'<li><span class="sq {css_class}"></span>{name}'
-        f'{_test_badge_html(os.path.splitext(name)[0])}'
-        f'{_critic_badge_html(os.path.splitext(name)[0])}</li>'
-        for name in features
+    rows = ""
+    for name in features:
+        stem = os.path.splitext(name)[0]
+        ts = get_feature_test_status(stem, TESTS_DIR)
+        cs = get_feature_critic_status(stem, TESTS_DIR)
+        rows += (
+            f'<tr>'
+            f'<td><span class="sq {css_class}"></span>{name}</td>'
+            f'<td class="badge-cell">{_badge_html(ts)}</td>'
+            f'<td class="badge-cell">{_badge_html(cs)}</td>'
+            f'</tr>'
+        )
+    return (
+        f'<table class="ft">'
+        f'<thead><tr><th>Feature</th><th>Tests</th><th>Critic</th></tr></thead>'
+        f'<tbody>{rows}</tbody>'
+        f'</table>'
     )
-    return f'<ul class="fl">{items}</ul>'
 
 
 def generate_html():
@@ -289,9 +291,9 @@ def generate_html():
     visible_complete = [name for name, _ in complete_tuples[:COMPLETE_CAP]]
     overflow = total_complete - COMPLETE_CAP
 
-    todo_html = _feature_list_html(todo, "todo")
-    testing_html = _feature_list_html(testing, "testing")
-    complete_html = _feature_list_html(visible_complete, "complete")
+    todo_html = _feature_table_html(todo, "todo")
+    testing_html = _feature_table_html(testing, "testing")
+    complete_html = _feature_table_html(visible_complete, "complete")
     overflow_html = (
         f'<p class="dim">and {overflow} more&hellip;</p>' if overflow > 0 else ""
     )
@@ -321,8 +323,11 @@ body{{
 h2{{font-size:13px;color:#FFF;margin-bottom:6px;border-bottom:1px solid #2A2F36;padding-bottom:4px}}
 h3{{font-size:11px;color:#888;margin:8px 0 2px;text-transform:uppercase;letter-spacing:.5px}}
 .features{{background:#1A2028;border-radius:4px;padding:8px 10px;margin-bottom:10px}}
-.fl{{list-style:none}}
-.fl li{{display:flex;align-items:center;margin-bottom:1px;line-height:1.5}}
+.ft{{width:100%;border-collapse:collapse}}
+.ft th{{text-align:left;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:2px 6px;border-bottom:1px solid #2A2F36}}
+.ft td{{padding:2px 6px;line-height:1.5}}
+.ft tr:hover{{background:#1E2630}}
+.badge-cell{{text-align:center;width:60px}}
 .sq{{width:7px;height:7px;margin-right:6px;flex-shrink:0;border-radius:1px}}
 .sq.complete{{background:#32CD32}}
 .sq.testing{{background:#4A90E2}}

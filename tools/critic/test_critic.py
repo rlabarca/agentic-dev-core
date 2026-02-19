@@ -49,6 +49,7 @@ from critic import (
     run_user_testing_audit,
     generate_critic_json,
     generate_critic_report,
+    _policy_exempt_implementation_gate,
 )
 import logic_drift
 
@@ -392,7 +393,8 @@ class TestSpecGatePolicyAnchoring(unittest.TestCase):
     def test_no_prereq_on_non_policy(self):
         content = '# Feature: No Prereq\n\n## Overview\n'
         result = check_policy_anchoring(content, 'test_feature.md')
-        self.assertEqual(result['status'], 'FAIL')
+        self.assertEqual(result['status'], 'WARN')
+        self.assertIn('No prerequisite link found', result['detail'])
 
     def test_policy_file_exempt(self):
         content = '# Policy: Test\n'
@@ -971,6 +973,168 @@ Policy requirements.
         result = run_spec_gate(policy_content, 'arch_test_policy.md', self.features_dir)
         anchoring = result['checks']['policy_anchoring']
         self.assertEqual(anchoring['status'], 'PASS')
+
+
+# ===================================================================
+# Policy File Tests (New Scenarios from spec commit 74aced2)
+# ===================================================================
+
+POLICY_FILE_CONTENT = """\
+# Architectural Policy: Test Policy
+
+> Label: "Policy: Test"
+> Category: "Quality Assurance"
+
+## 1. Purpose
+This policy defines test constraints.
+
+## 2. Invariants
+
+### 2.1 Some Invariant
+All features MUST do something.
+
+## 3. Configuration
+Some config info.
+
+## Implementation Notes
+* This policy governs test constraints.
+"""
+
+POLICY_FILE_NO_PURPOSE = """\
+# Architectural Policy: Incomplete
+
+> Label: "Policy: Incomplete"
+
+## 2. Invariants
+
+### 2.1 Some Invariant
+All features MUST do something.
+"""
+
+
+class TestSpecGatePolicyFileReducedEvaluation(unittest.TestCase):
+    """Scenario: Spec Gate Policy File Reduced Evaluation"""
+
+    def setUp(self):
+        self.features_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.features_dir)
+
+    def test_policy_file_checks_purpose_invariants(self):
+        result = run_spec_gate(
+            POLICY_FILE_CONTENT, 'arch_test_policy.md', self.features_dir)
+        sc = result['checks']['section_completeness']
+        self.assertEqual(sc['status'], 'PASS')
+        self.assertIn('Purpose', sc['detail'])
+        self.assertIn('Invariants', sc['detail'])
+
+    def test_policy_file_missing_purpose_fails(self):
+        result = run_spec_gate(
+            POLICY_FILE_NO_PURPOSE, 'arch_test_policy.md', self.features_dir)
+        sc = result['checks']['section_completeness']
+        self.assertEqual(sc['status'], 'FAIL')
+        self.assertIn('Purpose', sc['detail'])
+
+    def test_policy_file_scenario_classification_skipped(self):
+        result = run_spec_gate(
+            POLICY_FILE_CONTENT, 'arch_test_policy.md', self.features_dir)
+        sc_class = result['checks']['scenario_classification']
+        self.assertEqual(sc_class['status'], 'PASS')
+        self.assertEqual(sc_class['detail'], 'N/A - policy file')
+
+    def test_policy_file_gherkin_quality_skipped(self):
+        result = run_spec_gate(
+            POLICY_FILE_CONTENT, 'arch_test_policy.md', self.features_dir)
+        gq = result['checks']['gherkin_quality']
+        self.assertEqual(gq['status'], 'PASS')
+        self.assertEqual(gq['detail'], 'N/A - policy file')
+
+    def test_policy_file_overall_passes(self):
+        result = run_spec_gate(
+            POLICY_FILE_CONTENT, 'arch_test_policy.md', self.features_dir)
+        self.assertEqual(result['status'], 'PASS')
+
+
+class TestImplementationGatePolicyFileExempt(unittest.TestCase):
+    """Scenario: Implementation Gate Policy File Exempt"""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.features_dir = os.path.join(self.root, 'features')
+        os.makedirs(self.features_dir)
+        self.policy_path = os.path.join(
+            self.features_dir, 'arch_test_policy.md')
+        with open(self.policy_path, 'w') as f:
+            f.write(POLICY_FILE_CONTENT)
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def test_exempt_gate_returns_pass(self):
+        gate = _policy_exempt_implementation_gate()
+        self.assertEqual(gate['status'], 'PASS')
+
+    def test_exempt_gate_all_checks_pass(self):
+        gate = _policy_exempt_implementation_gate()
+        for check_name, check_result in gate['checks'].items():
+            self.assertEqual(
+                check_result['status'], 'PASS',
+                f'{check_name} should be PASS for policy file')
+
+    def test_exempt_gate_detail_says_exempt(self):
+        gate = _policy_exempt_implementation_gate()
+        for check_name, check_result in gate['checks'].items():
+            self.assertIn(
+                'N/A - policy file exempt', check_result['detail'],
+                f'{check_name} detail should say exempt')
+
+    def test_generate_critic_json_uses_exempt_for_policy(self):
+        import critic
+        orig_features = critic.FEATURES_DIR
+        orig_tests = critic.TESTS_DIR
+        orig_root = critic.PROJECT_ROOT
+        critic.FEATURES_DIR = self.features_dir
+        critic.TESTS_DIR = os.path.join(self.root, 'tests')
+        critic.PROJECT_ROOT = self.root
+        try:
+            data = generate_critic_json(self.policy_path)
+            self.assertEqual(
+                data['implementation_gate']['status'], 'PASS')
+            for check_name, check_result in \
+                    data['implementation_gate']['checks'].items():
+                self.assertEqual(check_result['status'], 'PASS')
+        finally:
+            critic.FEATURES_DIR = orig_features
+            critic.TESTS_DIR = orig_tests
+            critic.PROJECT_ROOT = orig_root
+
+
+class TestPolicyAnchoringMissingPrereqFile(unittest.TestCase):
+    """Verify FAIL only when referenced prerequisite file doesn't exist."""
+
+    def setUp(self):
+        self.features_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.features_dir)
+
+    def test_missing_prereq_file_fails_integrity(self):
+        content = '> Prerequisite: features/arch_nonexistent.md\n'
+        result = check_prerequisite_integrity(content, self.features_dir)
+        self.assertEqual(result['status'], 'FAIL')
+
+    def test_existing_prereq_file_passes_integrity(self):
+        with open(os.path.join(self.features_dir, 'arch_test.md'), 'w') as f:
+            f.write('# Policy\n')
+        content = '> Prerequisite: arch_test.md\n'
+        result = check_prerequisite_integrity(content, self.features_dir)
+        self.assertEqual(result['status'], 'PASS')
+
+    def test_no_prereq_warns_not_fails(self):
+        content = '# Feature: No Prereq\n'
+        result = check_policy_anchoring(content, 'some_feature.md')
+        self.assertEqual(result['status'], 'WARN')
 
 
 # ===================================================================
