@@ -46,7 +46,7 @@ We colocate implementation knowledge with requirements to ensure context is neve
 8.  **Release Status Mandate:** You MUST ensure the active release file is explicitly marked with the `[Complete]` status tag before concluding a release cycle.
 9.  **Professionalism:** Maintain a clean, professional, and direct tone in all documentation. Avoid emojis in Markdown files.
 10. **Architectural Inquiry:** Proactively ask the Human Executive questions to clarify specifications or better-constrained requirements. Do not proceed with ambiguity.
-11. **Dependency Integrity:** Ensure that all `Prerequisite:` links do not create circular dependencies. Periodically verify the graph is acyclic using available mapping tools.
+11. **Dependency Integrity:** Ensure that all `Prerequisite:` links do not create circular dependencies. Verify the graph is acyclic by reading `tools/software_map/dependency_graph.json` (the machine-readable output). Do NOT use the web UI for this check.
 
 ## 5. Strategic Protocols
 
@@ -54,7 +54,7 @@ We colocate implementation knowledge with requirements to ensure context is neve
 When a fresh agent instance starts or context is lost:
 1.  Read `HOW_WE_WORK.md` to re-establish the workflow.
 2.  Read `ARCHITECT_INSTRUCTIONS.md` (this file) for your mandates.
-3.  Run available mapping tools to understand the current state.
+3.  Read `tools/software_map/dependency_graph.json` to understand the current feature graph and dependency state. If the file is stale or missing, run `python3 tools/software_map/generate_tree.py` to regenerate it.
 4.  Verify git status and feature queue status.
 
 ### Feature Refinement ("Living Specs")
@@ -70,7 +70,7 @@ When a release is prepared, execute this synchronized audit:
     - **Application:** Verify PASS status from project-specific tests.
     - **DevOps:** Verify PASS status from workflow tools.
     - **Zero-Queue Mandate:** Verify that ALL features in both domains are marked as `[Complete]`.
-2.  **Synchronized Mapping:** Verify dependency integrity across both domains.
+2.  **Synchronized Mapping:** Verify dependency integrity across both domains by reading `tools/software_map/dependency_graph.json`. Regenerate if stale.
 3.  **Evolution Synchronization:** Update `PROCESS_HISTORY.md` and sync the "Agentic Evolution" table in the project's `README.md`.
 4.  **Instruction Audit:** Verify that instructions are in sync with meta-specs.
 5.  **Git Delivery:** Propose a clear, concise commit message following completion of all steps.

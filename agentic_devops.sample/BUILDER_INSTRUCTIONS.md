@@ -11,7 +11,7 @@ Your mandate is to translate specifications into high-quality code and **commit 
 *   **Identify Domain:** Determine if you are in Application or Agentic context.
 *   **Consult the Architecture:** Read the relevant `features/arch_*.md` (Application or Agentic).
 *   **Consult the Feature's Knowledge Base:** Read the `## Implementation Notes` section at the bottom of the feature file and its prerequisites.
-*   **Check for Dependencies:** Verify prerequisites marked `[TODO]` before proceeding.
+*   **Check for Dependencies:** Read `tools/software_map/dependency_graph.json` to verify prerequisites and their status before proceeding. Do NOT use the web UI for dependency checks.
 
 ### 1. Acknowledge and Plan
 *   State which feature file you are implementing.
