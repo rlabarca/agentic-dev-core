@@ -33,12 +33,23 @@ CORE_REL_PATH = os.path.relpath(CORE_ABS_PATH, PROJECT_ROOT)
 
 DOMAINS = []
 
-if not IS_META:
+if IS_META:
+    # In meta mode, both domains resolve to the same features/ directory.
+    # Show both columns so the UI always has the required two-column layout.
+    DOMAINS.append({
+        "label": "Application",
+        "features_rel": os.path.join(CORE_REL_PATH, "features"),
+        "features_abs": os.path.join(CORE_ABS_PATH, "features"),
+        "test_mode": "devops_aggregate",
+        "tools_dir": os.path.join(CORE_ABS_PATH, "tools"),
+        "test_label": "App Tests",
+    })
+else:
     DOMAINS.append({
         "label": "Application",
         "features_rel": "features",
         "features_abs": os.path.join(PROJECT_ROOT, "features"),
-        "test_mode": "auto", # Can be project-specific
+        "test_mode": "auto",
         "test_label": "App Tests",
     })
 
