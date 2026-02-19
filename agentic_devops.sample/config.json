@@ -1,4 +1,5 @@
 {
     "cdd_port": 8086,
-    "map_port": 8087
+    "map_port": 8087,
+    "tools_root": "agentic-dev/tools"
 }

@@ -2,6 +2,28 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-19] v2.0.0 Submodule-Ready Layered Architecture
+- **Problem:** Consumer projects adopted the framework via `cp -r agentic_devops.sample .agentic_devops`, creating a fork that diverges permanently with no merge path for upstream updates. Framework rules and project-specific context lived in the same monolithic files.
+- **Solution: Layered Instruction Architecture:**
+    - **Base Layer** (`instructions/`): New directory containing `ARCHITECT_BASE.md`, `BUILDER_BASE.md`, `HOW_WE_WORK_BASE.md`. These hold all framework-generic rules extracted from the former monolithic instruction files. Read-only from the consumer's perspective.
+    - **Override Layer** (`.agentic_devops/`): Restructured to contain only thin override files (`ARCHITECT_OVERRIDES.md`, `BUILDER_OVERRIDES.md`, `HOW_WE_WORK_OVERRIDES.md`) with project-specific rules. Consumer projects customize these without touching framework code.
+    - **Launcher Scripts** (`run_claude_architect.sh`, `run_claude_builder.sh`): Rewritten to concatenate base + override files into a temporary prompt file at launch time. Detect standalone vs. submodule mode automatically.
+- **Sample Directory Restructure** (`agentic_devops.sample/`):
+    - Replaced monolithic `ARCHITECT_INSTRUCTIONS.md`, `BUILDER_INSTRUCTIONS.md`, `HOW_WE_WORK.md` with override templates (`*_OVERRIDES.md`).
+    - Updated `config.json` to include `tools_root: "agentic-dev/tools"` for submodule path resolution.
+- **New Tool Feature Specs:**
+    - `features/submodule_bootstrap.md`: Specifies `tools/bootstrap.sh` for initializing consumer projects. Includes project root detection, override directory creation, launcher generation, gitignore guidance, and tool start script config discovery (submodule-aware climbing logic).
+    - `features/submodule_sync.md`: Specifies `tools/sync_upstream.sh` for auditing upstream changes after submodule updates. Includes SHA comparison, changelog display, and structural change flagging.
+- **Core Override Files:**
+    - `.agentic_devops/ARCHITECT_OVERRIDES.md`: Contains only the "Sample Sync Prompt" rule (core-specific).
+    - `.agentic_devops/BUILDER_OVERRIDES.md`: Contains only the "Server Startup Prohibition" rule (core-specific).
+    - `.agentic_devops/HOW_WE_WORK_OVERRIDES.md`: Minimal (core has no special workflow deviations).
+    - `.agentic_devops/config.json`: Added `tools_root: "tools"` (standalone mode).
+- **Deleted Files:** `.agentic_devops/ARCHITECT_INSTRUCTIONS.md`, `.agentic_devops/BUILDER_INSTRUCTIONS.md`, `.agentic_devops/HOW_WE_WORK.md` (replaced by base+override split).
+- **Port Allocation Convention:** Core uses 9086/9087; consumer projects default to 8086/8087. No collision when both run simultaneously.
+- **README.md:** Added "Using as a Submodule" section, layered architecture explanation, update/sync workflow, gitignore guidance, port allocation table. Updated Agentic Evolution table.
+- **Impact:** All new tool feature specs are in `[TODO]` state. Builder must implement `tools/bootstrap.sh`, `tools/sync_upstream.sh`, and update `tools/cdd/start.sh` and `tools/software_map/start.sh` for submodule-aware config discovery.
+
 ## [2026-02-18] Colocate HOW_WE_WORK.md into .agentic_devops/
 - **Change:** Moved `HOW_WE_WORK.md` from project root into `.agentic_devops/HOW_WE_WORK.md`. Added a copy to `agentic_devops.sample/` for distribution to adopting projects.
 - **Rationale:** All workflow-defining artifacts (role instructions, config, and now the process philosophy) are colocated in a single distributable folder. This prepares the framework for clean adoption by external projects.

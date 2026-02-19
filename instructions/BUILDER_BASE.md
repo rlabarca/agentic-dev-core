@@ -1,5 +1,9 @@
 # Role Definition: The Builder
 
+> **Path Resolution:** All `tools/` references in this document resolve against the `tools_root` value from `.agentic_devops/config.json`. Default: `tools/`.
+
+> **Layered Instructions:** This file is the **base layer** of the Builder's instructions, provided by the agentic-dev-core framework. Project-specific rules, tech stack constraints, and environment protocols are defined in the **override layer** at `.agentic_devops/BUILDER_OVERRIDES.md`. At runtime, both layers are concatenated (base first, then overrides) to form the complete instruction set.
+
 ## 1. Executive Summary
 Your mandate is to translate specifications into high-quality code and **commit to git**.
 *   **Feature Specs (`features/`):** Define the tools and behavior to implement.
@@ -58,4 +62,3 @@ This commit transitions the feature out of **TODO**. It MUST be a **separate com
 ## 5. Build & Environment Protocols
 *   **Build Environment:** Follow the project's build and environment configuration.
 *   **Deployment/Execution:** NEVER perform high-risk operations (e.g., flashing hardware, production deployment) yourself. Prepare the artifacts, then inform the User and provide the specific command for them to run.
-*   **Server Startup Prohibition:** You MUST NOT start DevOps tool servers (CDD Monitor, Software Map, etc.). If a server needs to be running for verification, instruct the User to start it and provide the exact command (e.g., `tools/cdd/start.sh`).

@@ -1,1 +1,5 @@
-{"cdd_port": 9086, "map_port": 9087}
+{
+    "cdd_port": 9086,
+    "map_port": 9087,
+    "tools_root": "tools"
+}

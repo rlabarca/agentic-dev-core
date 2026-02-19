@@ -25,29 +25,92 @@ The framework defines two distinct agent roles:
 ### 3. Knowledge Colocation
 Instead of separate documentation or global logs, implementation discoveries, hardware constraints, and design decisions are stored directly within the feature specifications they pertain to.
 
+### 4. Layered Instruction Architecture
+The framework separates **framework rules** (base layer) from **project-specific context** (override layer):
+*   **Base Layer** (`instructions/`): Core rules, protocols, and philosophies. Read-only from the consumer's perspective.
+*   **Override Layer** (`.agentic_devops/`): Project-specific customizations, domain context, and workflow additions.
+
+At launch, the launcher scripts concatenate base + override files into a single agent prompt. This allows upstream framework updates without merge conflicts in project-specific configuration.
+
 ## Setup & Configuration
 
-1.  **Initialize the Environment:**
-    Copy the sample configuration folder to your project root:
+### Option A: Using as a Submodule (Recommended for Projects)
+
+1.  **Add the submodule:**
     ```bash
-    cp -r agentic_devops.sample .agentic_devops
+    git submodule add https://github.com/rlabarca/agentic-dev-core agentic-dev
+    git submodule update --init
     ```
 
-2.  **Agent Context:**
-    Point your AI agents (Architect and Builder) to the instructions located in `.agentic_devops/`:
-    *   **Architect:** `.agentic_devops/ARCHITECT_INSTRUCTIONS.md`
-    *   **Builder:** `.agentic_devops/BUILDER_INSTRUCTIONS.md`
+2.  **Run the bootstrap:**
+    ```bash
+    ./agentic-dev/tools/bootstrap.sh
+    ```
+    This creates:
+    *   `.agentic_devops/` -- override templates and config (MUST be committed to your project)
+    *   `run_claude_architect.sh` / `run_claude_builder.sh` -- layered launcher scripts
+    *   `features/` directory and `PROCESS_HISTORY.md`
 
-3.  **Customize Config:**
-    Edit `.agentic_devops/config.json` to set your preferred ports for the CDD Monitor and Software Map tools.
+3.  **Customize your overrides:**
+    Edit the files in `.agentic_devops/`:
+    *   `ARCHITECT_OVERRIDES.md` -- project-specific Architect rules and domain context
+    *   `BUILDER_OVERRIDES.md` -- tech stack constraints, build environment rules
+    *   `HOW_WE_WORK_OVERRIDES.md` -- project-specific workflow additions
+    *   `config.json` -- ports and tool paths
+
+4.  **Launch agents:**
+    ```bash
+    ./run_claude_architect.sh   # Architect agent
+    ./run_claude_builder.sh     # Builder agent
+    ```
+
+### Option B: Standalone (For Framework Development)
+
+1.  **Launch agents directly:**
+    ```bash
+    ./run_claude_architect.sh
+    ./run_claude_builder.sh
+    ```
+    The launcher scripts detect standalone mode and use `instructions/` and `.agentic_devops/` from the repo root.
+
+### Updating the Submodule
+
+```bash
+cd agentic-dev && git pull origin main && cd ..
+git add agentic-dev
+./agentic-dev/tools/sync_upstream.sh   # Audit changes, update sync marker
+git commit -m "chore: update agentic-dev submodule"
+```
+
+The sync script shows a changelog of what changed in `instructions/` and `tools/`, and flags any structural changes that may require override updates.
+
+### Gitignore Guidance
+
+**`.agentic_devops/` MUST be committed** to your project. It contains project-specific overrides, config, and the upstream sync marker. The bootstrap script will warn if it detects `.agentic_devops` in your `.gitignore`.
 
 ## Directory Structure
 
-*   `features/`: Meta-specifications for the Agentic Workflow itself.
-*   `tools/`: Python-based DevOps tools that support the workflow (CDD Monitor, Software Map, etc.).
-*   `ARCHITECT_INSTRUCTIONS.md`: The "Constitution" for the Architect role.
-*   `BUILDER_INSTRUCTIONS.md`: The "Protocol" for the Builder role.
-*   `.agentic_devops/HOW_WE_WORK.md`: The high-level philosophy and lifecycle.
+*   `instructions/` -- Base instruction layer (framework rules, read-only for consumers).
+    *   `ARCHITECT_BASE.md` -- Core Architect mandates and protocols.
+    *   `BUILDER_BASE.md` -- Core Builder implementation protocol.
+    *   `HOW_WE_WORK_BASE.md` -- Core workflow philosophy and lifecycle.
+*   `.agentic_devops/` -- Override layer (project-specific customizations).
+    *   `ARCHITECT_OVERRIDES.md` -- Project-specific Architect rules.
+    *   `BUILDER_OVERRIDES.md` -- Project-specific Builder rules.
+    *   `HOW_WE_WORK_OVERRIDES.md` -- Project-specific workflow additions.
+    *   `config.json` -- Ports, `tools_root`, and other configuration.
+*   `agentic_devops.sample/` -- Override templates for new consumer projects.
+*   `features/` -- Meta-specifications for the framework's own tools.
+*   `tools/` -- Python-based DevOps tools (CDD Monitor, Software Map, Bootstrap, Upstream Sync).
+
+## Port Allocation
+
+| Context | CDD Port | Map Port |
+|---------|----------|----------|
+| agentic-dev-core standalone | 9086 | 9087 |
+| Consumer project default | 8086 | 8087 |
+
+Consumer projects get 8086/8087 by default (from `agentic_devops.sample/config.json`). Core development uses 9086/9087. No collision when both run simultaneously.
 
 ## Feature Map
 <!-- MERMAID_START -->
@@ -61,9 +124,14 @@ flowchart TD
         title_DevOps_Tools ~~~ cdd_status_monitor
         software_map_generator["Tool: Software Map<br/><small>software_map_generator.md</small>"]
         title_DevOps_Tools ~~~ software_map_generator
+        submodule_bootstrap["Tool: Bootstrap<br/><small>submodule_bootstrap.md</small>"]
+        title_DevOps_Tools ~~~ submodule_bootstrap
+        submodule_sync["Tool: Upstream Sync<br/><small>submodule_sync.md</small>"]
+        title_DevOps_Tools ~~~ submodule_sync
     end
 
     %% Relationships
+    submodule_bootstrap --> submodule_sync
 
     %% Styling Definitions
     classDef default fill:#e1f5fe,stroke:#01579b,stroke-width:1px,color:black;
@@ -82,6 +150,7 @@ flowchart TD
 
 | Version | Milestone | Workflow Changes |
 | :--- | :--- | :--- |
+| v2.0.0 | Submodule-Ready Layered Architecture | Split instructions into base+override layers; submodule consumption model with bootstrap and sync tools; port isolation (9086/9087 core, 8086/8087 consumer). |
 | v1.0.1 | Port Isolation & Spec Refinement | Configurable ports for tool isolation; Meta-mode support; Refined instruction specs. |
 | v1.0.0 | Framework Bootstrap | Isolated workflow from project context; Generalized role definitions. |
 
