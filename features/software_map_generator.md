@@ -45,6 +45,9 @@ Generates a visual and machine-readable representation of the project's feature 
 *   **Graph Display:** The dependency graph MUST be rendered as an interactive diagram with feature nodes and directed edges representing prerequisite links.
 *   **Category Grouping:** Feature nodes MUST be visually grouped by their `Category` metadata (as defined in each feature file's `> Category:` line). Each group MUST be clearly delineated (e.g., via labeled bounding boxes or distinct spatial clusters) so that the category structure is immediately apparent.
 *   **Node Labels:** Each feature node MUST display both its friendly name (the `Label` from the feature file metadata) and its filename. Both pieces of information must be visible without requiring hover or click interaction.
+*   **Label Typography:** The friendly name (Label) MUST be rendered in larger, bolder text than the filename. This establishes a clear visual hierarchy where the human-readable name is the primary identifier and the filename is secondary.
+*   **Label Non-Overlap:** Node labels (both friendly name and filename) MUST NOT visually overlap with labels of neighboring nodes or with each other. The layout engine must provide sufficient spacing, padding, or collision avoidance to ensure all text remains fully legible at the default zoom-to-fit level.
+*   **Dark Color Scheme:** The software map MUST use a dark color scheme (dark background with light text and edges). All UI elements (graph background, category groups, nodes, modals, search input, controls) MUST be styled consistently with a dark theme.
 *   **No Legend:** The graph MUST NOT display a legend overlay. Node semantics are conveyed through category grouping and direct labeling.
 *   **Zoom-to-Fit on Load:** On initial page load, the graph MUST be automatically zoomed and centered to fit the viewable page area. On auto-refresh cycles, the current zoom level and pan position MUST be preserved.
 *   **Search/Filter:** A text input MUST be provided that filters visible graph nodes by label or filename. Nodes that do not match the filter should be visually de-emphasized or hidden.
@@ -83,6 +86,9 @@ These scenarios MUST NOT be validated through automated tests. The Builder MUST 
     Then the dependency graph is rendered with nodes and edges
     And feature nodes are visually grouped by their Category metadata
     And each node displays its Label and its filename
+    And the Label is rendered in larger, bolder text than the filename
+    And no node labels overlap with neighboring node labels
+    And the overall UI uses a dark color scheme
     And no legend overlay is displayed
     And the graph is zoomed to fit the viewable page area
     And a search input is visible for filtering nodes
