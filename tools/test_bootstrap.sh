@@ -5,7 +5,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUBMODULE_SRC="$(cd "$SCRIPT_DIR/.." && pwd)"
-STATUS_FILE="$SCRIPT_DIR/test_status.json"
+TESTS_DIR="$SUBMODULE_SRC/tests"
 PASS=0
 FAIL=0
 ERRORS=""
@@ -340,19 +340,20 @@ if [ $FAIL -gt 0 ]; then
 fi
 echo "==============================="
 
-# Write test_status.json
+# Write tests/<feature>/tests.json for both covered features
+RESULT_JSON="{\"status\": \"$([ $FAIL -eq 0 ] && echo PASS || echo FAIL)\", \"passed\": $PASS, \"failed\": $FAIL, \"total\": $TOTAL}"
+
+for FEATURE in submodule_bootstrap submodule_sync; do
+    OUTDIR="$TESTS_DIR/$FEATURE"
+    mkdir -p "$OUTDIR"
+    echo "$RESULT_JSON" > "$OUTDIR/tests.json"
+done
+
+echo ""
 if [ $FAIL -eq 0 ]; then
-    cat > "$STATUS_FILE" << EOF
-{"status": "PASS", "passed": $PASS, "failed": 0, "total": $TOTAL}
-EOF
-    echo ""
-    echo "test_status.json: PASS"
+    echo "tests.json: PASS"
     exit 0
 else
-    cat > "$STATUS_FILE" << EOF
-{"status": "FAIL", "passed": $PASS, "failed": $FAIL, "total": $TOTAL}
-EOF
-    echo ""
-    echo "test_status.json: FAIL"
+    echo "tests.json: FAIL"
     exit 1
 fi

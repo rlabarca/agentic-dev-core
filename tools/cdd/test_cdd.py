@@ -2,88 +2,96 @@ import unittest
 from unittest.mock import patch, MagicMock
 import os
 import json
+import sys
 import tempfile
 import shutil
-from serve import (get_devops_aggregated_test_status, get_feature_status,
-                    COMPLETE_CAP, extract_label, generate_feature_status_json)
+from serve import (get_feature_test_status, aggregate_test_statuses,
+                    get_feature_status, COMPLETE_CAP, extract_label,
+                    generate_feature_status_json)
 
-class TestCDD(unittest.TestCase):
+
+class TestPerFeatureTestStatus(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.tools_dir = os.path.join(self.test_dir, "tools")
-        os.makedirs(self.tools_dir)
 
     def tearDown(self):
         shutil.rmtree(self.test_dir)
 
-    def test_aggregation_all_pass(self):
-        # Create two tool dirs with PASS
-        for tool in ["tool1", "tool2"]:
-            d = os.path.join(self.tools_dir, tool)
-            os.makedirs(d)
-            with open(os.path.join(d, "test_status.json"), "w") as f:
-                json.dump({"status": "PASS"}, f)
+    def _write_tests_json(self, feature_stem, data):
+        d = os.path.join(self.test_dir, feature_stem)
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "tests.json"), "w") as f:
+            json.dump(data, f)
 
-        status, msg = get_devops_aggregated_test_status(self.tools_dir)
-        self.assertEqual(status, "PASS")
-        self.assertIn("All tools nominal", msg)
+    def _write_raw(self, feature_stem, content):
+        d = os.path.join(self.test_dir, feature_stem)
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "tests.json"), "w") as f:
+            f.write(content)
 
-    def test_aggregation_one_fail(self):
-        # One PASS, one FAIL
-        d1 = os.path.join(self.tools_dir, "tool_ok")
-        os.makedirs(d1)
-        with open(os.path.join(d1, "test_status.json"), "w") as f:
-            json.dump({"status": "PASS"}, f)
+    def test_pass_status(self):
+        self._write_tests_json("my_feature", {"status": "PASS"})
+        self.assertEqual(get_feature_test_status("my_feature", self.test_dir), "PASS")
 
-        d2 = os.path.join(self.tools_dir, "tool_bad")
-        os.makedirs(d2)
-        with open(os.path.join(d2, "test_status.json"), "w") as f:
-            json.dump({"status": "FAIL"}, f)
+    def test_fail_status(self):
+        self._write_tests_json("my_feature", {"status": "FAIL"})
+        self.assertEqual(get_feature_test_status("my_feature", self.test_dir), "FAIL")
 
-        status, msg = get_devops_aggregated_test_status(self.tools_dir)
-        self.assertEqual(status, "FAIL")
-        self.assertIn("tool_bad", msg)
+    def test_missing_file_returns_none(self):
+        self.assertIsNone(get_feature_test_status("nonexistent", self.test_dir))
 
-    def test_aggregation_malformed_json(self):
-        d = os.path.join(self.tools_dir, "tool_corrupt")
-        os.makedirs(d)
-        with open(os.path.join(d, "test_status.json"), "w") as f:
-            f.write("{ invalid json")
+    def test_malformed_json_returns_fail(self):
+        self._write_raw("bad_feature", "{ invalid json")
+        self.assertEqual(get_feature_test_status("bad_feature", self.test_dir), "FAIL")
 
-        status, msg = get_devops_aggregated_test_status(self.tools_dir)
-        self.assertEqual(status, "FAIL")
-        self.assertIn("tool_corrupt", msg)
+    def test_missing_status_field_returns_fail(self):
+        self._write_tests_json("no_status", {"tests": 5})
+        self.assertEqual(get_feature_test_status("no_status", self.test_dir), "FAIL")
 
-    def test_aggregation_missing_files_ignored(self):
-        # Tool dir with NO test_status.json should be ignored
-        d = os.path.join(self.tools_dir, "tool_no_tests")
-        os.makedirs(d)
+    def test_extra_metadata_ignored(self):
+        self._write_tests_json("detailed", {"status": "PASS", "tests": 10, "failures": 0})
+        self.assertEqual(get_feature_test_status("detailed", self.test_dir), "PASS")
 
-        status, msg = get_devops_aggregated_test_status(self.tools_dir)
-        self.assertEqual(status, "UNKNOWN")
 
+class TestAggregateTestStatuses(unittest.TestCase):
+    def test_all_pass(self):
+        self.assertEqual(aggregate_test_statuses(["PASS", "PASS"]), "PASS")
+
+    def test_one_fail(self):
+        self.assertEqual(aggregate_test_statuses(["PASS", "FAIL"]), "FAIL")
+
+    def test_all_fail(self):
+        self.assertEqual(aggregate_test_statuses(["FAIL", "FAIL"]), "FAIL")
+
+    def test_empty_returns_unknown(self):
+        self.assertEqual(aggregate_test_statuses([]), "UNKNOWN")
+
+
+class TestFeatureStatusCapping(unittest.TestCase):
     @patch('serve.run_command')
     def test_feature_status_complete_capping(self, mock_run):
-        # Mock git log to return timestamps for 15 "complete" features
-        features_abs = os.path.join(self.test_dir, "features")
-        os.makedirs(features_abs)
-        for i in range(15):
-            fname = f"feat_{i:02d}.md"
-            with open(os.path.join(features_abs, fname), "w") as f:
-                f.write("# Test")
+        test_dir = tempfile.mkdtemp()
+        try:
+            features_abs = os.path.join(test_dir, "features")
+            os.makedirs(features_abs)
+            for i in range(15):
+                fname = f"feat_{i:02d}.md"
+                with open(os.path.join(features_abs, fname), "w") as f:
+                    f.write("# Test")
 
-        # Mock run_command: return high timestamp for Complete, empty for Ready
-        # (complete_ts > test_ts and file_mod_ts <= complete_ts)
-        def mock_git(cmd):
-            if "Complete" in cmd:
-                return "2000000000"
-            return ""
-        mock_run.side_effect = mock_git
+            def mock_git(cmd):
+                if "Complete" in cmd:
+                    return "2000000000"
+                return ""
+            mock_run.side_effect = mock_git
 
-        complete, testing, todo = get_feature_status("features", features_abs)
-        self.assertEqual(len(complete), 15)
-        self.assertEqual(len(testing), 0)
-        self.assertEqual(len(todo), 0)
+            complete, testing, todo = get_feature_status("features", features_abs)
+            self.assertEqual(len(complete), 15)
+            self.assertEqual(len(testing), 0)
+            self.assertEqual(len(todo), 0)
+        finally:
+            shutil.rmtree(test_dir)
+
 
 class TestExtractLabel(unittest.TestCase):
     def setUp(self):
@@ -118,13 +126,13 @@ class TestFeatureStatusJSON(unittest.TestCase):
 
     @patch('serve.FEATURES_REL', 'features')
     @patch('serve.FEATURES_ABS', '/tmp/test_features')
-    @patch('serve.TOOLS_DIR', '/tmp/test_tools')
+    @patch('serve.TESTS_DIR', '/tmp/test_tests')
     @patch('serve.get_feature_status')
-    @patch('serve.get_devops_aggregated_test_status')
+    @patch('serve.get_feature_test_status')
     @patch('serve.extract_label')
     def test_json_structure_flat(self, mock_label, mock_test, mock_features):
         mock_features.return_value = ([("feat_a.md", 100)], ["feat_b.md"], ["feat_c.md"])
-        mock_test.return_value = ("PASS", "All good")
+        mock_test.return_value = None  # No test files
         mock_label.return_value = "Test Label"
 
         data = generate_feature_status_json()
@@ -134,29 +142,70 @@ class TestFeatureStatusJSON(unittest.TestCase):
         self.assertIn("test_status", data)
         self.assertNotIn("domains", data)
 
-        self.assertEqual(data["test_status"], "PASS")
+        self.assertEqual(data["test_status"], "UNKNOWN")
         self.assertEqual(len(data["features"]["complete"]), 1)
         self.assertEqual(len(data["features"]["testing"]), 1)
         self.assertEqual(len(data["features"]["todo"]), 1)
-        # Each entry must have file and label keys
         for entry in data["features"]["todo"]:
             self.assertIn("file", entry)
             self.assertIn("label", entry)
 
     @patch('serve.FEATURES_REL', 'features')
     @patch('serve.FEATURES_ABS', '/tmp/test_features')
-    @patch('serve.TOOLS_DIR', '/tmp/test_tools')
+    @patch('serve.TESTS_DIR', '/tmp/test_tests')
     @patch('serve.get_feature_status')
-    @patch('serve.get_devops_aggregated_test_status')
+    @patch('serve.get_feature_test_status')
+    @patch('serve.extract_label')
+    def test_per_feature_test_status_included(self, mock_label, mock_test, mock_features):
+        mock_features.return_value = ([], [], ["feat_with_tests.md", "feat_no_tests.md"])
+        mock_label.return_value = "Label"
+
+        def side_effect(stem, _tests_dir):
+            if stem == "feat_with_tests":
+                return "PASS"
+            return None
+        mock_test.side_effect = side_effect
+
+        data = generate_feature_status_json()
+
+        todo = data["features"]["todo"]
+        entry_with = next(e for e in todo if "feat_with_tests" in e["file"])
+        entry_without = next(e for e in todo if "feat_no_tests" in e["file"])
+
+        self.assertEqual(entry_with["test_status"], "PASS")
+        self.assertNotIn("test_status", entry_without)
+        self.assertEqual(data["test_status"], "PASS")
+
+    @patch('serve.FEATURES_REL', 'features')
+    @patch('serve.FEATURES_ABS', '/tmp/test_features')
+    @patch('serve.TESTS_DIR', '/tmp/test_tests')
+    @patch('serve.get_feature_status')
+    @patch('serve.get_feature_test_status')
+    @patch('serve.extract_label')
+    def test_aggregate_fail_propagates(self, mock_label, mock_test, mock_features):
+        mock_features.return_value = ([], [], ["good.md", "bad.md"])
+        mock_label.return_value = "Label"
+
+        def side_effect(stem, _tests_dir):
+            return "PASS" if stem == "good" else "FAIL"
+        mock_test.side_effect = side_effect
+
+        data = generate_feature_status_json()
+        self.assertEqual(data["test_status"], "FAIL")
+
+    @patch('serve.FEATURES_REL', 'features')
+    @patch('serve.FEATURES_ABS', '/tmp/test_features')
+    @patch('serve.TESTS_DIR', '/tmp/test_tests')
+    @patch('serve.get_feature_status')
+    @patch('serve.get_feature_test_status')
     @patch('serve.extract_label')
     def test_arrays_sorted_by_file(self, mock_label, mock_test, mock_features):
-        # Return features in non-alphabetical order
         mock_features.return_value = (
             [("z_feat.md", 300), ("a_feat.md", 100), ("m_feat.md", 200)],
             ["z_test.md", "a_test.md"],
             ["z_todo.md", "a_todo.md"],
         )
-        mock_test.return_value = ("PASS", "OK")
+        mock_test.return_value = None
         mock_label.return_value = "Label"
 
         data = generate_feature_status_json()
@@ -169,13 +218,13 @@ class TestFeatureStatusJSON(unittest.TestCase):
 
     @patch('serve.FEATURES_REL', 'features')
     @patch('serve.FEATURES_ABS', '/tmp/test_features')
-    @patch('serve.TOOLS_DIR', '/tmp/test_tools')
+    @patch('serve.TESTS_DIR', '/tmp/test_tests')
     @patch('serve.get_feature_status')
-    @patch('serve.get_devops_aggregated_test_status')
+    @patch('serve.get_feature_test_status')
     @patch('serve.extract_label')
     def test_json_keys_sorted(self, mock_label, mock_test, mock_features):
         mock_features.return_value = ([], [], ["feat.md"])
-        mock_test.return_value = ("PASS", "OK")
+        mock_test.return_value = None
         mock_label.return_value = "Label"
 
         data = generate_feature_status_json()
@@ -250,4 +299,26 @@ class TestHandlerRouting(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    # Run tests and produce tests/cdd_status_monitor/tests.json
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+    tests_out_dir = os.path.join(project_root, "tests", "cdd_status_monitor")
+    os.makedirs(tests_out_dir, exist_ok=True)
+    status_file = os.path.join(tests_out_dir, "tests.json")
+
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromModule(sys.modules[__name__])
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
+
+    status = "PASS" if result.wasSuccessful() else "FAIL"
+    with open(status_file, 'w') as f:
+        json.dump({
+            "status": status,
+            "tests": result.testsRun,
+            "failures": len(result.failures) + len(result.errors),
+            "tool": "cdd",
+            "runner": "unittest"
+        }, f)
+    print(f"\n{status_file}: {status}")
+
+    sys.exit(0 if result.wasSuccessful() else 1)

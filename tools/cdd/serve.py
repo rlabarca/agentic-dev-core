@@ -27,7 +27,7 @@ PORT = CONFIG.get("cdd_port", 8086)
 
 FEATURES_REL = "features"
 FEATURES_ABS = os.path.join(PROJECT_ROOT, "features")
-TOOLS_DIR = os.path.join(PROJECT_ROOT, "tools")
+TESTS_DIR = os.path.join(PROJECT_ROOT, "tests")
 
 COMPLETE_CAP = 10
 FEATURE_STATUS_PATH = os.path.join(os.path.dirname(__file__), "feature_status.json")
@@ -104,46 +104,54 @@ def get_feature_status(features_rel, features_abs):
     return complete, sorted(testing), sorted(todo)
 
 
-def get_devops_aggregated_test_status(tools_dir):
-    """Aggregates test_status.json from all tool subdirectories."""
-    if not os.path.isdir(tools_dir):
-        return "UNKNOWN", "No tools directory"
+def get_feature_test_status(feature_stem, tests_dir):
+    """Looks up tests/<feature_stem>/tests.json and returns status or None.
 
-    found_any = False
-    failures = []
+    Returns "PASS", "FAIL", or None (when no tests.json exists).
+    Malformed JSON is treated as FAIL.
+    """
+    tests_path = os.path.join(tests_dir, feature_stem, "tests.json")
+    if not os.path.isfile(tests_path):
+        return None
+    try:
+        with open(tests_path, 'r') as f:
+            data = json.load(f)
+        if data.get("status") == "PASS":
+            return "PASS"
+        return "FAIL"
+    except (json.JSONDecodeError, IOError, OSError):
+        return "FAIL"
 
-    for entry in sorted(os.listdir(tools_dir)):
-        status_path = os.path.join(tools_dir, entry, "test_status.json")
-        if not os.path.isfile(status_path):
-            continue
 
-        found_any = True
-        try:
-            with open(status_path, 'r') as f:
-                data = json.load(f)
-            if data.get("status") != "PASS":
-                failures.append(entry)
-        except (json.JSONDecodeError, KeyError):
-            failures.append(entry)
+def aggregate_test_statuses(statuses):
+    """Aggregates per-feature test statuses into a top-level status.
 
-    if not found_any:
-        return "UNKNOWN", "No test reports found"
-
-    if failures:
-        return "FAIL", f"Failing: {', '.join(failures)}"
-
-    return "PASS", "All tools nominal"
+    statuses: list of non-None per-feature test status values.
+    Returns "FAIL" if any FAIL, "PASS" if all PASS, "UNKNOWN" if empty.
+    """
+    if not statuses:
+        return "UNKNOWN"
+    if any(s == "FAIL" for s in statuses):
+        return "FAIL"
+    return "PASS"
 
 
 def generate_feature_status_json():
     """Generates the feature_status.json data structure per spec (flat schema)."""
     complete_tuples, testing, todo = get_feature_status(FEATURES_REL, FEATURES_ABS)
-    test_status, _ = get_devops_aggregated_test_status(TOOLS_DIR)
+
+    all_test_statuses = []
 
     def make_entry(fname):
         rel_path = os.path.normpath(os.path.join(FEATURES_REL, fname))
         label = extract_label(os.path.join(FEATURES_ABS, fname))
-        return {"file": rel_path, "label": label}
+        entry = {"file": rel_path, "label": label}
+        stem = os.path.splitext(fname)[0]
+        ts = get_feature_test_status(stem, TESTS_DIR)
+        if ts is not None:
+            entry["test_status"] = ts
+            all_test_statuses.append(ts)
+        return entry
 
     return {
         "features": {
@@ -152,7 +160,7 @@ def generate_feature_status_json():
             "todo": sorted([make_entry(n) for n in todo], key=lambda x: x["file"]),
         },
         "generated_at": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        "test_status": test_status,
+        "test_status": aggregate_test_statuses(all_test_statuses),
     }
 
 
@@ -174,12 +182,22 @@ def get_last_commit():
     return run_command("git log -1 --format='%h %s (%cr)'")
 
 
+def _test_badge_html(feature_stem):
+    """Returns an HTML badge for per-feature test status, or empty string."""
+    ts = get_feature_test_status(feature_stem, TESTS_DIR)
+    if ts is None:
+        return ""
+    css = "st-pass" if ts == "PASS" else "st-fail"
+    return f' <span class="{css}">[{ts}]</span>'
+
+
 def _feature_list_html(features, css_class):
-    """Renders a <ul> of feature names with status squares."""
+    """Renders a <ul> of feature names with status squares and test badges."""
     if not features:
         return ""
     items = ''.join(
-        f'<li><span class="sq {css_class}"></span>{name}</li>'
+        f'<li><span class="sq {css_class}"></span>{name}'
+        f'{_test_badge_html(os.path.splitext(name)[0])}</li>'
         for name in features
     )
     return f'<ul class="fl">{items}</ul>'
@@ -190,7 +208,21 @@ def generate_html():
     git_status = get_git_status()
     last_commit = get_last_commit()
     complete_tuples, testing, todo = get_feature_status(FEATURES_REL, FEATURES_ABS)
-    test_status, test_msg = get_devops_aggregated_test_status(TOOLS_DIR)
+
+    # Aggregate per-feature test statuses for the top-level badge
+    all_test_statuses = []
+    all_fnames = [n for n, _ in complete_tuples] + testing + todo
+    for fname in all_fnames:
+        stem = os.path.splitext(fname)[0]
+        ts = get_feature_test_status(stem, TESTS_DIR)
+        if ts is not None:
+            all_test_statuses.append(ts)
+    test_status = aggregate_test_statuses(all_test_statuses)
+    test_msg = (
+        "All features nominal" if test_status == "PASS"
+        else "No test reports found" if test_status == "UNKNOWN"
+        else f"{sum(1 for s in all_test_statuses if s == 'FAIL')} feature(s) failing"
+    )
 
     # COMPLETE capping
     total_complete = len(complete_tuples)

@@ -157,4 +157,28 @@ class TestMermaidGeneration(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    import sys
+
+    # Run tests and produce tests/software_map_generator/tests.json
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+    tests_out_dir = os.path.join(project_root, "tests", "software_map_generator")
+    os.makedirs(tests_out_dir, exist_ok=True)
+    status_file = os.path.join(tests_out_dir, "tests.json")
+
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromModule(sys.modules[__name__])
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
+
+    status = "PASS" if result.wasSuccessful() else "FAIL"
+    with open(status_file, 'w') as f:
+        json.dump({
+            "status": status,
+            "tests": result.testsRun,
+            "failures": len(result.failures) + len(result.errors),
+            "tool": "software_map",
+            "runner": "unittest"
+        }, f)
+    print(f"\n{status_file}: {status}")
+
+    sys.exit(0 if result.wasSuccessful() else 1)
