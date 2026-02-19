@@ -2,6 +2,41 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-19] v3.0.0 Critic Quality Gate System + QA Persona
+- **Problem:** Four failure modes in the Architect-Builder async workflow: underspecification, invisible autonomy, no automated traceability, and user testing gaps.
+- **Solution: Critic Quality Gate System:**
+    - **Dual-Gate Validation:** Spec Gate (pre-implementation) validates feature spec completeness, Gherkin quality, policy anchoring, and prerequisite integrity. Implementation Gate (post-implementation) validates traceability, policy adherence, builder decisions, and optional LLM-based logic drift detection.
+    - **Traceability Engine:** Automated keyword matching between Gherkin scenario titles and test function names/bodies (2+ keyword threshold). Manual scenarios exempt.
+    - **Policy Adherence Scanner:** Scans for FORBIDDEN pattern violations defined in `arch_*.md` files.
+    - **Logic Drift Engine (LLM):** Optional semantic comparison of scenario intent vs. test implementation. Disabled by default (`critic_llm_enabled: false`).
+    - **Per-Feature Output:** `tests/<feature>/critic.json` with spec_gate, implementation_gate, and user_testing sections.
+    - **Aggregate Report:** `CRITIC_REPORT.md` at project root.
+- **QA Agent (New Role):**
+    - Third agent role alongside Architect and Builder.
+    - Owns `## User Testing Discoveries` section in feature files (exclusive write access).
+    - Records structured discoveries: [BUG], [DISCOVERY], [INTENT_DRIFT].
+    - Discovery lifecycle: OPEN -> SPEC_UPDATED -> RESOLVED -> PRUNED.
+    - New instruction file: `instructions/QA_BASE.md`.
+    - New override files: `.agentic_devops/QA_OVERRIDES.md`, `agentic_devops.sample/QA_OVERRIDES.md`.
+    - New launcher: `run_claude_qa.sh`.
+- **Builder Decision Protocol:**
+    - Added Step 2b to `instructions/BUILDER_BASE.md`.
+    - Structured tags: [CLARIFICATION] (INFO), [AUTONOMOUS] (WARN), [DEVIATION] (HIGH), [DISCOVERY] (HIGH).
+    - DEVIATION and DISCOVERY require Architect acknowledgment before COMPLETE.
+- **New Architectural Policy:** `features/arch_critic_policy.md` -- defines invariants for the Critic system (Dual-Gate, Traceability, Builder Decision Transparency, User Testing Feedback Loop, Policy Adherence).
+- **New Feature Spec:** `features/critic_tool.md` -- specifies the Critic tool implementation.
+- **HOW_WE_WORK_BASE.md Updates:**
+    - Added QA Agent to Section 2 (Roles and Responsibilities).
+    - Updated Section 3 (Feature Lifecycle) to include QA verification step.
+    - Updated Section 6 (Layered Architecture) to reference QA launcher.
+    - Added Section 7 (User Testing Protocol) with discovery types, lifecycle, queue hygiene, and feedback routing.
+- **Feature Spec Updates:**
+    - `features/cdd_status_monitor.md`: Added Section 2.5 (Critic Status Integration) with per-feature `critic_status`, top-level aggregation, dashboard badge, and optional blocking. Added automated and manual scenarios. Resets to TODO.
+    - `features/submodule_bootstrap.md`: Added QA launcher to Section 2.5, updated bootstrap scenario to include QA files, added QA launcher concatenation scenario. Resets to TODO.
+- **Config Changes:** Added `critic_llm_model`, `critic_llm_enabled`, `critic_gate_blocking` to both `.agentic_devops/config.json` and `agentic_devops.sample/config.json`.
+- **README.md:** Added QA role to Role Separation section, QA launcher documentation, `instructions/QA_BASE.md` to directory structure, updated Agentic Evolution table.
+- **Impact:** New feature specs are in [TODO] state. Modified feature specs reset to [TODO]. Builder must implement the Critic tool (`tools/critic/`), CDD critic integration, and bootstrap QA launcher generation.
+
 ## [2026-02-19] v2.0.0 Submodule-Ready Layered Architecture
 - **Problem:** Consumer projects adopted the framework via `cp -r agentic_devops.sample .agentic_devops`, creating a fork that diverges permanently with no merge path for upstream updates. Framework rules and project-specific context lived in the same monolithic files.
 - **Solution: Layered Instruction Architecture:**

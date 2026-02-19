@@ -18,9 +18,10 @@ The project's state is defined 100% by specification files:
 *   **Living Specifications (`*.md`):** Behavioral requirements (Gherkin) coupled with Implementation Notes (Tribal Knowledge).
 
 ### 2. Role Separation
-The framework defines two distinct agent roles:
+The framework defines three distinct agent roles:
 *   **The Architect:** Owns "The What and The Why." Designs specifications and enforces architectural integrity.
 *   **The Builder:** Owns "The How." Implements code and tests based on specifications and documents discoveries.
+*   **The QA Agent:** Owns "The Verification and The Feedback." Executes manual scenarios, records structured discoveries, and tracks their resolution.
 
 ### 3. Knowledge Colocation
 Instead of separate documentation or global logs, implementation discoveries, hardware constraints, and design decisions are stored directly within the feature specifications they pertain to.
@@ -48,13 +49,14 @@ At launch, the launcher scripts concatenate base + override files into a single 
     ```
     This creates:
     *   `.agentic_devops/` -- override templates and config (MUST be committed to your project)
-    *   `run_claude_architect.sh` / `run_claude_builder.sh` -- layered launcher scripts
+    *   `run_claude_architect.sh` / `run_claude_builder.sh` / `run_claude_qa.sh` -- layered launcher scripts
     *   `features/` directory and `PROCESS_HISTORY.md`
 
 3.  **Customize your overrides:**
     Edit the files in `.agentic_devops/`:
     *   `ARCHITECT_OVERRIDES.md` -- project-specific Architect rules and domain context
     *   `BUILDER_OVERRIDES.md` -- tech stack constraints, build environment rules
+    *   `QA_OVERRIDES.md` -- project-specific QA verification rules
     *   `HOW_WE_WORK_OVERRIDES.md` -- project-specific workflow additions
     *   `config.json` -- ports and tool paths
 
@@ -62,6 +64,7 @@ At launch, the launcher scripts concatenate base + override files into a single 
     ```bash
     ./run_claude_architect.sh   # Architect agent
     ./run_claude_builder.sh     # Builder agent
+    ./run_claude_qa.sh          # QA agent
     ```
 
 ### Option B: Standalone (For Framework Development)
@@ -72,6 +75,8 @@ At launch, the launcher scripts concatenate base + override files into a single 
     ./run_claude_builder.sh
     ```
     The launcher scripts detect standalone mode and use `instructions/` and `.agentic_devops/` from the repo root.
+
+    All three launchers (`run_claude_architect.sh`, `run_claude_builder.sh`, `run_claude_qa.sh`) are available in standalone mode.
 
 ### Updating the Submodule
 
@@ -93,15 +98,17 @@ The sync script shows a changelog of what changed in `instructions/` and `tools/
 *   `instructions/` -- Base instruction layer (framework rules, read-only for consumers).
     *   `ARCHITECT_BASE.md` -- Core Architect mandates and protocols.
     *   `BUILDER_BASE.md` -- Core Builder implementation protocol.
+    *   `QA_BASE.md` -- Core QA verification and discovery protocol.
     *   `HOW_WE_WORK_BASE.md` -- Core workflow philosophy and lifecycle.
 *   `.agentic_devops/` -- Override layer (project-specific customizations).
     *   `ARCHITECT_OVERRIDES.md` -- Project-specific Architect rules.
     *   `BUILDER_OVERRIDES.md` -- Project-specific Builder rules.
+    *   `QA_OVERRIDES.md` -- Project-specific QA verification rules.
     *   `HOW_WE_WORK_OVERRIDES.md` -- Project-specific workflow additions.
-    *   `config.json` -- Ports, `tools_root`, and other configuration.
+    *   `config.json` -- Ports, `tools_root`, critic configuration, and other settings.
 *   `agentic_devops.sample/` -- Override templates for new consumer projects.
 *   `features/` -- Meta-specifications for the framework's own tools.
-*   `tools/` -- Python-based DevOps tools (CDD Monitor, Software Map, Bootstrap, Upstream Sync).
+*   `tools/` -- Python-based DevOps tools (CDD Monitor, Software Map, Critic, Bootstrap, Upstream Sync).
 
 ## Port Allocation
 
@@ -134,7 +141,16 @@ flowchart TD
         title_Initialization_&_Update ~~~ submodule_sync
     end
 
+    subgraph Quality_Assurance [" "]
+        title_Quality_Assurance["QUALITY ASSURANCE"]
+        arch_critic_policy["Policy: Critic Quality Gate<br/><small>arch_critic_policy.md</small>"]
+        title_Quality_Assurance ~~~ arch_critic_policy
+        critic_tool["Tool: Critic<br/><small>critic_tool.md</small>"]
+        title_Quality_Assurance ~~~ critic_tool
+    end
+
     %% Relationships
+    arch_critic_policy --> critic_tool
     submodule_bootstrap --> submodule_sync
 
     %% Styling Definitions
@@ -148,6 +164,7 @@ flowchart TD
     %% Style Applications
     class title_DevOps_Tools subgraphTitle;
     class title_Initialization_&_Update subgraphTitle;
+    class title_Quality_Assurance subgraphTitle;
 ```
 <!-- MERMAID_END -->
 
@@ -155,6 +172,7 @@ flowchart TD
 
 | Version | Milestone | Workflow Changes |
 | :--- | :--- | :--- |
+| v3.0.0 | Critic Quality Gate + QA Persona | Dual-gate validation (Spec Gate + Implementation Gate); Critic tool with traceability engine, policy adherence scanner, and optional LLM logic drift; QA Agent role with structured discovery protocol; Builder Decision Protocol with structured tags. |
 | v2.0.0 | Submodule-Ready Layered Architecture | Split instructions into base+override layers; submodule consumption model with bootstrap and sync tools; port isolation (9086/9087 core, 8086/8087 consumer). |
 | v1.0.1 | Port Isolation & Spec Refinement | Configurable ports for tool isolation; Meta-mode support; Refined instruction specs. |
 | v1.0.0 | Framework Bootstrap | Isolated workflow from project context; Generalized role definitions. |

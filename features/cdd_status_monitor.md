@@ -47,6 +47,13 @@ The Continuous Design-Driven (CDD) Monitor tracks the status of all feature file
 *   **Deterministic Output:** Arrays MUST be sorted by file path. Keys MUST be sorted.
 *   **Agent Contract:** Agents MUST query status via `curl http://localhost:<port>/status.json` where `<port>` is read from `.agentic_devops/config.json` (`cdd_port`, default `8086`). Agents MUST NOT scrape the web dashboard or guess ports.
 
+### 2.5 Critic Status Integration
+*   **Critic JSON Discovery:** For each feature `features/<name>.md`, the monitor checks for `tests/<name>/critic.json` alongside `tests/<name>/tests.json`.
+*   **Per-Feature Critic Status:** If `critic.json` exists, the feature entry gains a `critic_status` field with the value from the overall gate status (derived from the worse of `spec_gate.status` and `implementation_gate.status`). If no `critic.json` exists, the `critic_status` key is omitted.
+*   **Top-Level Aggregation:** The status JSON gains a top-level `critic_status` field using the same aggregation logic as `test_status`: FAIL if any feature reports FAIL, PASS only if all features with critic files report PASS, UNKNOWN if no critic files exist.
+*   **Dashboard Badge:** Each feature entry on the web dashboard displays a `[CRITIC: PASS|WARN|FAIL]` badge when `critic.json` exists.
+*   **Optional Blocking:** When `critic_gate_blocking` is `true` in `.agentic_devops/config.json`, the CDD monitor prevents a feature with `critic_status: FAIL` from transitioning to COMPLETE. The status tag commit is recognized but the feature remains in its current state.
+
 ## 3. Scenarios
 
 ### Automated Scenarios
@@ -66,6 +73,19 @@ These scenarios are validated by the Builder's automated test suite.
     Then the Architect calls GET /status.json on the configured CDD port
     And verifies that the "todo" and "testing" arrays are empty
 
+#### Scenario: Critic Status in API Response
+    Given the CDD server is running
+    And tests/<feature_name>/critic.json exists for a feature
+    When an agent calls GET /status.json
+    Then the feature entry includes a critic_status field
+    And the top-level response includes an aggregated critic_status field
+
+#### Scenario: Critic Status Omitted When No File
+    Given the CDD server is running
+    And no critic.json exists for a feature
+    When an agent calls GET /status.json
+    Then the feature entry does not include a critic_status field
+
 ### Manual Scenarios (Human Verification Required)
 These scenarios MUST NOT be validated through automated tests. The Builder must start the server and instruct the User to verify the web dashboard visually.
 
@@ -79,6 +99,12 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
     Given the User is viewing the web dashboard
     When a feature status changes (e.g., a status commit is made)
     Then the dashboard reflects the updated status within 5 seconds
+
+#### Scenario: Critic Badge on Dashboard
+    Given the CDD server is running
+    And critic.json files exist for some features
+    When the User opens the web dashboard
+    Then each feature with a critic.json shows a CRITIC badge with PASS, WARN, or FAIL
 
 ## 4. Implementation Notes
 *   **Test Scope:** Automated tests MUST only cover the `/status.json` API endpoint and the underlying status logic. The web dashboard HTML rendering and visual layout MUST NOT be tested through automated tests. The Builder MUST NOT start the CDD server. After passing automated tests, the Builder should use the `[Ready for Verification]` status tag and instruct the User to start the server (`tools/cdd/start.sh`) and visually verify the dashboard.

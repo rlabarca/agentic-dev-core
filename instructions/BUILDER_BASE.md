@@ -38,6 +38,22 @@ The CDD Monitor tracks every feature through three states. Status is driven enti
 *   **Architectural Escalation:** If a discovery affects a global rule, you MUST update the relevant `arch_*.md` file. This ensures the "Constitution" remains accurate. Do NOT create separate log files.
 *   **Commit Implementation Work:** Stage and commit all implementation code, tests, AND any feature file edits (Implementation Notes) together: `git commit -m "feat(scope): implement FEATURE_NAME"`. This commit does NOT include a status tag -- it is a work commit. The feature remains in **TODO** after this commit.
 
+### 2b. Builder Decision Protocol (MANDATORY)
+When making non-trivial implementation decisions, you MUST classify and document them in the `## Implementation Notes` section using structured tags.
+
+**Decision Categories:**
+*   **`[CLARIFICATION]`** (Severity: INFO) -- Interpreted ambiguous spec language. The spec was unclear; you chose a reasonable interpretation.
+*   **`[AUTONOMOUS]`** (Severity: WARN) -- Spec was silent on this topic. You made a judgment call to fill the gap.
+*   **`[DEVIATION]`** (Severity: HIGH) -- Intentionally diverged from what the spec says. Requires Architect acknowledgment before COMPLETE.
+*   **`[DISCOVERY]`** (Severity: HIGH) -- Found an unstated requirement during implementation. Requires Architect acknowledgment before COMPLETE.
+
+**Format:** `**[TAG]** <description> (Severity: <level>)`
+
+**Rules:**
+*   `[CLARIFICATION]` and `[AUTONOMOUS]` are informational. They do not block completion but are audited by the Critic tool.
+*   `[DEVIATION]` and `[DISCOVERY]` MUST be acknowledged by the Architect (via spec update or explicit approval) before the feature can transition to `[Complete]`.
+*   When in doubt between CLARIFICATION and AUTONOMOUS, use AUTONOMOUS. Transparency is preferred over underreporting.
+
 ### 3. Verify Locally
 *   **Testing (MANDATORY):**
     *   **DO NOT** use global application test scripts. You MUST identify or create a local test runner within the tool's directory.

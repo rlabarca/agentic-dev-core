@@ -27,13 +27,14 @@ Initializes a consumer project that has added `agentic-dev-core` as a git submod
 *   **Format:** Plain text, single line, the full 40-character SHA.
 
 ### 2.5 Launcher Script Generation
-*   **Files Generated:** `run_claude_architect.sh` and `run_claude_builder.sh` at the project root. Both MUST be marked executable (`chmod +x`).
+*   **Files Generated:** `run_claude_architect.sh`, `run_claude_builder.sh`, and `run_claude_qa.sh` at the project root. All MUST be marked executable (`chmod +x`).
 *   **Architect Launcher Logic:**
     1. Determine the framework directory (the submodule path) relative to the script's location.
     2. Create a temporary file (cleaned up on exit via `trap`).
     3. Concatenate in order: `<framework>/instructions/HOW_WE_WORK_BASE.md`, `<framework>/instructions/ARCHITECT_BASE.md`, `.agentic_devops/HOW_WE_WORK_OVERRIDES.md` (if exists), `.agentic_devops/ARCHITECT_OVERRIDES.md` (if exists).
     4. Launch `claude --append-system-prompt-file <temp_file>`.
 *   **Builder Launcher Logic:** Same concatenation pattern with BUILDER files. Launch with `claude --append-system-prompt-file <temp_file> --dangerously-skip-permissions`.
+*   **QA Launcher Logic:** Same concatenation pattern with QA files (`QA_BASE.md`, `QA_OVERRIDES.md`). Launch with `claude --append-system-prompt-file <temp_file>`.
 *   **Override Tolerance:** If an override file does not exist, the launcher MUST skip it silently (no error).
 
 ### 2.6 Project Scaffolding
@@ -62,11 +63,11 @@ Initializes a consumer project that has added `agentic-dev-core` as a git submod
     Given agentic-dev-core is added as a submodule at "agentic-dev/"
     And no .agentic_devops/ directory exists at the project root
     When the user runs "agentic-dev/tools/bootstrap.sh"
-    Then .agentic_devops/ is created with ARCHITECT_OVERRIDES.md, BUILDER_OVERRIDES.md, HOW_WE_WORK_OVERRIDES.md, and config.json
+    Then .agentic_devops/ is created with ARCHITECT_OVERRIDES.md, BUILDER_OVERRIDES.md, QA_OVERRIDES.md, HOW_WE_WORK_OVERRIDES.md, and config.json
     And config.json contains "tools_root": "agentic-dev/tools"
     And .agentic_devops/.upstream_sha contains the current submodule HEAD SHA
-    And run_claude_architect.sh and run_claude_builder.sh exist at the project root
-    And both launcher scripts are executable
+    And run_claude_architect.sh, run_claude_builder.sh, and run_claude_qa.sh exist at the project root
+    And all launcher scripts are executable
     And features/ directory exists at the project root
     And PROCESS_HISTORY.md exists at the project root
 
@@ -83,6 +84,14 @@ Initializes a consumer project that has added `agentic-dev-core` as a git submod
     Then ARCHITECT_BASE.md content second
     Then HOW_WE_WORK_OVERRIDES.md content third (if it exists)
     Then ARCHITECT_OVERRIDES.md content fourth (if it exists)
+
+#### Scenario: QA Launcher Script Concatenation Order
+    Given bootstrap has been run successfully
+    When run_claude_qa.sh is executed
+    Then the system prompt file contains HOW_WE_WORK_BASE.md content first
+    Then QA_BASE.md content second
+    Then HOW_WE_WORK_OVERRIDES.md content third (if it exists)
+    Then QA_OVERRIDES.md content fourth (if it exists)
 
 #### Scenario: Gitignore Warning
     Given .agentic_devops is listed in the project's .gitignore
