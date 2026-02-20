@@ -57,6 +57,7 @@ When a fresh agent instance starts or context is lost:
 2.  Read ARCHITECT instructions (base + overrides) for your mandates.
 3.  Read `tools/software_map/dependency_graph.json` to understand the current feature graph and dependency state. If the file is stale or missing, run `python3 tools/software_map/generate_tree.py` to regenerate it.
 4.  Verify git status. Read the CDD port from `.agentic_devops/config.json` (`cdd_port` key, default `8086`) and run `curl -s http://localhost:<port>/status.json` to check the feature queue status. If the server is not responding, start it with `tools/cdd/start.sh`.
+5.  Run `tools/critic/run.sh`. Review Architect action items in `CRITIC_REPORT.md` under the `### Architect` subsection.
 
 ### Feature Refinement ("Living Specs")
 We **DO NOT** create v2/v3 feature files.

@@ -2,6 +2,36 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-19] Critic as Project Coordination Engine
+- **Problem:** The Critic was a pass/fail badge on the CDD dashboard, but agents need a single source of truth for project health and role-specific priorities. The CDD dashboard showing `CRITIC: FAIL` on features was confusing -- CDD should show objective state, not coordination signals.
+- **Architectural Shift:** Critic redefined from "quality gate" to "project coordination engine." CDD shows what IS (feature status, test results, QA status). Critic shows what SHOULD BE DONE (role-specific action items).
+- **Policy Changes** (`features/arch_critic_policy.md`):
+    - Renamed from "Critic Quality Gate" to "Critic Coordination Engine".
+    - New Invariant 2.6 (Agent Startup Integration): every agent MUST run the Critic at session start.
+    - New Invariant 2.7 (Role-Specific Action Items): Critic generates imperative action items per role.
+    - New Invariant 2.8 (CDD Decoupling): Critic is agent-facing; CDD is human-facing.
+    - Deprecated `critic_gate_blocking` config key (retained as no-op for backward compatibility).
+- **Critic Tool Spec Changes** (`features/critic_tool.md`):
+    - Added Bash test file discovery (`test_*.sh`) with `[Scenario]` marker parsing to traceability engine.
+    - New Section 2.10 (Role-Specific Action Item Generation) with per-role derivation rules and priority levels.
+    - Section 2.9 (CDD Integration) decoupled: removed `critic_status` from CDD, CDD only reads `user_testing.status` for QA column.
+    - Extended `critic.json` schema with `action_items` object (architect/builder/qa arrays).
+    - Extended `CRITIC_REPORT.md` with "Action Items by Role" section (Architect/Builder/QA subsections).
+    - Added 7 new automated scenarios (bash discovery, bash matching, action items per role, JSON output, aggregate report).
+    - Removed "CDD Reads Critic Status" scenario. Updated "CDD Dashboard Critic Badge" to "CDD Dashboard QA Column".
+- **CDD Spec Changes** (`features/cdd_status_monitor.md`):
+    - Dashboard columns changed: Feature | Tests | Critic -> Feature | Tests | QA.
+    - QA column shows CLEAN (green) or HAS_OPEN_ITEMS (orange), read from `user_testing.status` in on-disk `critic.json`.
+    - Removed `critic_status` from status JSON (top-level and per-feature). Added optional `qa_status` per feature.
+    - Removed `critic_gate_blocking` logic. No status transition blocking.
+    - Replaced critic-status scenarios with qa-status equivalents.
+- **Instruction Changes:**
+    - `HOW_WE_WORK_BASE.md`: Added Section 8 (Critic-Driven Coordination).
+    - `ARCHITECT_BASE.md`: Added step 5 to Context Clear Protocol (run Critic, review Architect action items).
+    - `BUILDER_BASE.md`: Added "Run the Critic" to Pre-Flight Checks (review Builder action items).
+    - `QA_BASE.md`: Updated Startup Protocol step 3.3 to use QA action items from CRITIC_REPORT.md.
+- **Impact:** All three feature specs reset to TODO. Builder must implement: bash test discovery, action item generation, CDD QA column replacement, and critic_gate_blocking removal.
+
 ## [2026-02-19] Critic and CDD Spec Refinements (QA Feedback)
 - **Problem:** QA verification revealed CRITIC:FAIL badges on nearly every feature in the CDD dashboard due to incorrect evaluation of policy files, overly strict policy anchoring, and list-based layout making badges hard to scan.
 - **Critic Spec Changes** (`features/critic_tool.md`):

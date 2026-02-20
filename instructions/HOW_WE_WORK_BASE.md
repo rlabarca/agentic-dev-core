@@ -101,3 +101,11 @@ Status progression: `OPEN -> SPEC_UPDATED -> RESOLVED -> PRUNED`
 *   **BUG** -> Builder must fix implementation.
 *   **DISCOVERY** -> Architect must add missing scenarios, then Builder re-implements.
 *   **INTENT_DRIFT** -> Architect must refine scenario intent, then Builder re-implements.
+
+## 8. Critic-Driven Coordination
+The Critic is the project coordination engine. It validates quality AND generates role-specific action items. Every agent runs the Critic at session start.
+
+*   **CDD** shows what IS (feature status, test results, QA status).
+*   **Critic** shows what SHOULD BE DONE (role-specific action items).
+*   Agents consult `CRITIC_REPORT.md` for their role-specific priorities before starting work.
+*   CDD does NOT run the Critic. CDD is a lightweight state display; the Critic is an agent-facing coordination tool.

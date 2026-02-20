@@ -33,9 +33,9 @@ Run `tools/critic/run.sh` to generate critic reports for all features. This prod
 Read the `cdd_port` from `.agentic_devops/config.json` (default `8086`), then run `curl -s http://localhost:<cdd_port>/status.json` to get the current feature status. If the CDD server is not running, inform the user and provide the start command: `tools/cdd/start.sh`.
 
 ### 3.3 Identify Verification Targets
-Features in TESTING state are your verification targets. Present the user with a summary:
-*   How many features are in TESTING state.
-*   The critic report summary (spec gate / implementation gate status per feature).
+Review QA action items in `CRITIC_REPORT.md` under the `### QA` subsection. Present the user with a summary:
+*   How many features are in TESTING state (from CDD status).
+*   QA action items from the Critic report: features to verify, manual scenario counts, and SPEC_UPDATED discoveries to re-verify.
 *   Any existing OPEN discoveries that need re-verification.
 
 ### 3.4 Begin Interactive Verification

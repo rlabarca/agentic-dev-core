@@ -23,6 +23,7 @@ The CDD Monitor tracks every feature through three states. Status is driven enti
 ## 3. My Unbreakable Implementation & Commit Protocol
 
 ### 0. Pre-Flight Checks (MANDATORY)
+*   **Run the Critic:** Run `tools/critic/run.sh`. Review Builder action items in `CRITIC_REPORT.md` under the `### Builder` subsection. This identifies your priorities: failing tests, traceability gaps, and open bugs.
 *   **Consult the Architecture:** Read any relevant `features/arch_*.md` policies.
 *   **Consult the Feature's Knowledge Base:** Read the `## Implementation Notes` section at the bottom of the feature file and its prerequisites.
 *   **Check for Dependencies:** Read `tools/software_map/dependency_graph.json` to verify prerequisites and their status before proceeding. Do NOT use the web UI for dependency checks.
