@@ -2,6 +2,21 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-20] QA Actionability: SPEC_UPDATED Lifecycle Routing + QA Status Simplification
+
+- **Problem:** SPEC_UPDATED discoveries with `Action Required: Builder` generated Builder action items, keeping Builder=TODO even after the Builder had committed. Both `cdd_status_monitor` and `critic_tool` showed Builder=TODO when QA was the role that needed to act next. Additionally, QA=TODO triggered for OPEN items routing to Architect (condition c: HAS_OPEN_ITEMS), making the dashboard ambiguous about which agent to run.
+- **Root Cause:** SPEC_UPDATED-to-Builder routing was redundant with the feature lifecycle. When the Architect updates a spec, the feature resets to TODO lifecycle, which already gives the Builder a TODO. The discovery-based routing double-counted. QA TODO conditions were too broad -- they included items that QA could not act on.
+- **Solution:**
+    - **Removed SPEC_UPDATED-to-Builder routing:** SPEC_UPDATED discoveries no longer generate Builder action items. Builder signaling comes exclusively from the feature lifecycle (TODO state). The `Action Required` field on discoveries is informational only.
+    - **QA TODO condition (b) made lifecycle-dependent:** SPEC_UPDATED re-verify items only trigger QA=TODO when the feature is in TESTING lifecycle (Builder has committed).
+    - **QA TODO condition (c) removed:** HAS_OPEN_ITEMS no longer triggers QA=TODO. OPEN items routing to Architect/Builder are not QA-actionable.
+    - **QA CLEAN simplified:** Requires `tests.json` PASS only. OPEN items routing to other roles do not block CLEAN.
+    - **QA N/A becomes catch-all:** Covers no tests.json, tests.json FAIL without QA-specific concerns.
+    - **QA Actionability Principle:** New invariant -- QA=TODO only when QA has work to do RIGHT NOW.
+- **Scenarios Updated:** "Builder Action Items from SPEC_UPDATED Discovery" reversed (now verifies NO Builder items). "QA TODO for SPEC_UPDATED Items" requires TESTING. "QA TODO for HAS_OPEN_ITEMS" replaced with "QA CLEAN Despite OPEN Discoveries Routing to Architect". New scenario: "QA CLEAN for SPEC_UPDATED in TODO Lifecycle".
+- **Files Modified:** `features/arch_critic_policy.md` (Section 2.4), `features/critic_tool.md` (Sections 2.10, 2.11; 3 updated scenarios, 2 new scenarios), `PROCESS_HISTORY.md`.
+- **Impact:** Both feature specs reset to TODO. Builder must implement: remove SPEC_UPDATED-to-Builder routing from `generate_action_items()`, make QA TODO condition (b) lifecycle-dependent, remove QA TODO condition (c), simplify QA CLEAN computation.
+
 ## [2026-02-20] QA Server Prohibition + CDD Run Critic Button + Spec Hygiene
 
 - **Problem 1 (QA agent managing servers):** Despite the QA Override "Server Interaction Prohibition", the QA agent was still starting and stopping the CDD server during sessions. Root cause: QA_BASE.md Section 5.2 contained a Given-step example that cued the agent to ensure the server was running (`"Make sure the CDD server is running"`), which the agent interpreted as a directive to start/stop the process itself.

@@ -138,19 +138,20 @@ The Critic MUST generate imperative action items for each role based on the anal
 | **Builder** | Structural completeness FAIL (missing/failing tests) | "Fix failing tests for submodule_bootstrap" |
 | **Builder** | Traceability gaps (unmatched scenarios) | "Write tests for: Zero-Queue Verification" |
 | **Builder** | OPEN BUGs in User Testing | "Fix bug in critic_tool: [bug title]" |
-| **Builder** | SPEC_UPDATED discoveries with Builder action routing | "Implement fix for cdd_status_monitor: [discovery title]" |
 | **QA** | Features in TESTING status with manual scenarios (from CDD feature_status.json) | "Verify cdd_status_monitor: 3 manual scenario(s)" |
-| **QA** | SPEC_UPDATED discoveries | "Re-verify critic_tool: [item title]" |
+| **QA** | SPEC_UPDATED discoveries (feature in TESTING lifecycle) | "Re-verify critic_tool: [item title]" |
 
 **QA Action Item Filtering:** QA verification items (from TESTING status) are only generated when the feature has at least one manual scenario. Features with 0 manual scenarios do not generate QA verification action items.
 
-**SPEC_UPDATED Builder Routing:** A SPEC_UPDATED discovery generates a Builder action item when its `Action Required` field contains "Builder" (case-insensitive substring match). This covers discoveries where the Architect has updated the spec and the Builder must now implement the fix before QA can re-verify. The QA "Re-verify" action item is still generated alongside the Builder item -- the Builder fix is a prerequisite for meaningful re-verification.
+**SPEC_UPDATED Lifecycle Routing:** SPEC_UPDATED discoveries do NOT generate Builder action items. Builder signaling comes from the feature lifecycle: when the Architect updates a spec to address a discovery, the feature resets to TODO lifecycle, which gives the Builder a TODO via the lifecycle-based action item ("Review and implement spec changes"). After the Builder commits (feature enters TESTING), the SPEC_UPDATED discovery generates a QA re-verification item. The `Action Required` field on discoveries is informational only and does not drive Critic routing. This ensures at most one role has actionable work at a time per discovery, making the CDD dashboard unambiguous about which agent to run next.
+
+**QA Re-verification Filtering:** QA re-verification items (from SPEC_UPDATED discoveries) are only generated when the feature is in TESTING lifecycle state. This prevents QA=TODO while the Builder is still implementing (feature in TODO lifecycle).
 
 **Priority Levels:**
 *   **CRITICAL** -- `[INFEASIBLE]` tags (feature halted, Architect must revise spec).
 *   **HIGH** -- Gate FAIL, OPEN BUGs, OPEN SPEC_DISPUTEs, unacknowledged DEVIATIONs/DISCOVERYs.
 *   **HIGH** -- Feature in TODO lifecycle state (spec modified, implementation review needed).
-*   **MEDIUM** -- Traceability gaps, SPEC_UPDATED items awaiting re-verification or Builder fix.
+*   **MEDIUM** -- Traceability gaps, SPEC_UPDATED items awaiting QA re-verification.
 *   **LOW** -- Gate WARNs, informational items.
 
 **CDD Feature Status Dependency:** Builder and QA action items that depend on CDD feature status (TODO or TESTING state) require `.agentic_devops/cache/feature_status.json` to exist on disk. If unavailable, the Critic skips lifecycle-dependent items with a note in the report.
@@ -164,7 +165,7 @@ The Critic MUST compute a `role_status` object for each feature, summarizing whe
 
 **Builder Status:**
 *   `DONE`: structural_completeness PASS (tests.json exists with PASS), no open BUGs, no FAIL-level traceability issues, AND feature is NOT in TODO lifecycle state.
-*   `TODO`: Feature is in TODO lifecycle state (spec modified after last status commit, implementation review needed), OR has other Builder action items to address (traceability gaps, SPEC_UPDATED discoveries routed to Builder, etc.).
+*   `TODO`: Feature is in TODO lifecycle state (spec modified after last status commit, implementation review needed), OR has other Builder action items to address (traceability gaps, open BUGs, etc.).
 *   `FAIL`: tests.json exists with status FAIL.
 *   `INFEASIBLE`: `[INFEASIBLE]` tag present in Implementation Notes (Builder halted, escalated to Architect).
 *   `BLOCKED`: Active SPEC_DISPUTE exists for this feature (scenarios suspended, Builder cannot implement).
@@ -176,15 +177,15 @@ The Critic MUST compute a `role_status` object for each feature, summarizing whe
 **QA Status:**
 *   `FAIL`: Has OPEN BUGs in User Testing Discoveries. (Lifecycle-independent.)
 *   `DISPUTED`: Has OPEN SPEC_DISPUTEs in User Testing Discoveries (no BUGs). (Lifecycle-independent.)
-*   `TODO`: Any of: (a) Feature in TESTING lifecycle state with at least one manual scenario to verify; (b) Has SPEC_UPDATED items awaiting QA re-verification; (c) user_testing.status is HAS_OPEN_ITEMS (OPEN items routing to other roles). No OPEN BUGs or SPEC_DISPUTEs.
-*   `CLEAN`: user_testing.status is CLEAN AND `tests/<feature>/tests.json` exists with `status: "PASS"`. Lifecycle-independent -- a feature with passing tests and no open user testing items is CLEAN regardless of lifecycle state.
-*   `N/A`: No `tests/<feature>/tests.json` exists on disk AND no open user testing items of any kind. Indicates the feature has not been tested.
+*   `TODO`: Any of: (a) Feature in TESTING lifecycle state with at least one manual scenario to verify; (b) Has SPEC_UPDATED items AND feature is in TESTING lifecycle state (Builder has committed, QA can now re-verify). No OPEN BUGs or SPEC_DISPUTEs.
+*   `CLEAN`: `tests/<feature>/tests.json` exists with `status: "PASS"`, AND no FAIL/DISPUTED/TODO conditions matched. Lifecycle-independent. OPEN discoveries routing to other roles (Architect-routed DISCOVERYs, INTENT_DRIFTs) do NOT block CLEAN -- QA has no actionable work for items awaiting Architect or Builder.
+*   `N/A`: No FAIL/DISPUTED/TODO/CLEAN conditions matched. Catch-all for features with no `tests.json` on disk, or `tests.json` with FAIL status and no QA-specific concerns.
 
 **QA Precedence (highest wins):** FAIL > DISPUTED > TODO > CLEAN > N/A.
 
-**Lifecycle independence:** FAIL, DISPUTED, TODO (from conditions b/c), CLEAN, and N/A are all evaluated regardless of the feature's lifecycle state. A spec modification that resets the feature to TODO lifecycle does NOT suppress existing QA findings or test results. The only lifecycle-dependent QA status is TODO condition (a), which requires TESTING state.
+**QA Actionability Principle:** QA=TODO only when QA has work to do RIGHT NOW. OPEN items routing to Architect (DISCOVERYs, INTENT_DRIFTs) and SPEC_UPDATED items waiting for Builder (feature in TODO lifecycle) are not QA-actionable. This ensures the CDD dashboard shows at most one role with actionable TODO per discovery lifecycle step, making it unambiguous which agent to run next.
 
-**Lifecycle State Dependency:** QA TODO condition (a) uses `.agentic_devops/cache/feature_status.json` to determine the feature's lifecycle state (TESTING) for manual scenario verification. If unavailable, TESTING-based TODO detection is skipped. All other QA statuses (FAIL, DISPUTED, TODO from conditions b/c, CLEAN, N/A) are computed from on-disk `tests.json` and user testing items without lifecycle state.
+**Lifecycle State Dependency:** QA TODO conditions (a) and (b) both use `.agentic_devops/cache/feature_status.json` to determine the feature's lifecycle state (TESTING). If unavailable, TESTING-based TODO detection is skipped for both conditions. FAIL, DISPUTED, CLEAN, and N/A are lifecycle-independent.
 
 ### 2.12 Untracked File Audit
 The Critic MUST detect untracked files in the working directory and generate Architect action items for triage.
@@ -316,13 +317,12 @@ The Critic MUST detect untracked files in the working directory and generate Arc
     And the description says "Review and implement spec changes for <feature_name>"
     And role_status.builder is TODO
 
-#### Scenario: Builder Action Items from SPEC_UPDATED Discovery
+#### Scenario: SPEC_UPDATED Discovery Does Not Generate Builder Action Items
     Given a feature has a SPEC_UPDATED discovery in User Testing Discoveries
     And the discovery has "Action Required: Builder"
     When the Critic tool generates action items
-    Then a Builder action item is created with priority MEDIUM
-    And the description says "Implement fix for <feature_name>: [discovery title]"
-    And role_status.builder is TODO
+    Then no Builder action item is created from the SPEC_UPDATED discovery
+    And Builder signaling comes from the feature lifecycle state (TODO or DONE) not from discovery routing
 
 #### Scenario: QA Action Items from TESTING Status
     Given a feature is in TESTING state per CDD feature_status.json
@@ -439,19 +439,28 @@ The Critic MUST detect untracked files in the working directory and generate Arc
     Then role_status.qa is DISPUTED
     And DISPUTED takes precedence over N/A
 
-#### Scenario: Role Status QA TODO for SPEC_UPDATED Items
+#### Scenario: Role Status QA TODO for SPEC_UPDATED Items in TESTING
     Given a feature has SPEC_UPDATED items in User Testing Discoveries
     And the feature has no OPEN BUGs or SPEC_DISPUTEs
-    And the feature is in TODO lifecycle state
+    And the feature is in TESTING lifecycle state
     When the Critic tool computes role_status
     Then role_status.qa is TODO
 
-#### Scenario: Role Status QA TODO for HAS_OPEN_ITEMS
-    Given a feature has user_testing.status HAS_OPEN_ITEMS with OPEN discoveries
-    And the feature has no OPEN BUGs or SPEC_DISPUTEs or SPEC_UPDATED items
-    And the feature is in TODO lifecycle state
+#### Scenario: Role Status QA CLEAN Despite OPEN Discoveries Routing to Architect
+    Given a feature has OPEN discoveries in User Testing Discoveries routing to Architect
+    And the feature has no OPEN BUGs or SPEC_DISPUTEs
+    And tests/<feature>/tests.json exists with status PASS
     When the Critic tool computes role_status
-    Then role_status.qa is TODO
+    Then role_status.qa is CLEAN
+    And role_status.architect is TODO
+
+#### Scenario: Role Status QA CLEAN for SPEC_UPDATED in TODO Lifecycle
+    Given a feature has SPEC_UPDATED items in User Testing Discoveries
+    And the feature is in TODO lifecycle state (Builder has not yet committed)
+    And tests/<feature>/tests.json exists with status PASS
+    When the Critic tool computes role_status
+    Then role_status.qa is CLEAN
+    And role_status.builder is TODO
 
 #### Scenario: Role Status QA CLEAN for Feature with Passing Tests and No Manual Scenarios
     Given a feature is in TESTING lifecycle state
@@ -506,14 +515,15 @@ The Critic MUST detect untracked files in the working directory and generate Arc
 *   **LLM Cache:** Stored in `tools/critic/.cache/` as JSON files keyed by hash pairs. This directory should be gitignored.
 *   **No External Dependencies:** The deterministic components (Spec Gate, traceability, policy check) MUST NOT require any external packages beyond Python 3.9+ standard library. The LLM component requires the `anthropic` Python package only when enabled.
 *   **[CLARIFICATION]** DEVIATION/DISCOVERY action items route to Architect (not Builder), as the spec says these require Architect acknowledgment. Builder's role is to get that acknowledgment, but the Critic generates the item for the Architect to act on. (Severity: INFO)
-*   **Role Status Lifecycle Dependency:** `compute_role_status()` reads `feature_status.json` via `_get_feature_lifecycle_state()` only for QA TODO condition (a) -- TESTING state with manual scenarios. All other QA statuses (FAIL, DISPUTED, TODO from b/c, CLEAN, N/A) are lifecycle-independent. If `feature_status.json` doesn't exist on disk, TESTING-based TODO detection is skipped.
+*   **Role Status Lifecycle Dependency:** `compute_role_status()` reads `feature_status.json` via `_get_feature_lifecycle_state()` for QA TODO conditions (a) and (b) -- both require TESTING state. FAIL, DISPUTED, CLEAN, and N/A are lifecycle-independent. If `feature_status.json` doesn't exist on disk, TESTING-based TODO detection is skipped for both conditions.
 *   **QA CLEAN/N/A Signal:** QA CLEAN requires `tests/<feature>/tests.json` to exist with `status: "PASS"`. QA N/A means no tests.json exists. This makes QA status reflect actual test coverage: features with passing tests show CLEAN, features with no tests show N/A. Features with 0 manual scenarios but passing automated tests are CLEAN (not N/A).
 *   **Critic Report Readability scenario removed:** SPEC_DISPUTE resolved -- manual readability scenario removed since CRITIC_REPORT.md is agent-facing. Verified 2026-02-20.
 *   **[CLARIFICATION]** QA CLEAN computation restructured: pre-computes `testing_with_manual` flag then uses flat elif chain. This ensures TESTING + 0 manual scenarios falls through to CLEAN (not N/A), and TODO lifecycle with passing tests returns CLEAN (lifecycle-independent). Matches spec Sections 2.11 QA CLEAN/N/A definitions. (Severity: INFO)
 *   **User Testing Discovery Parsing:** The original line-by-line parsing in `generate_action_items()` and `compute_role_status()` checked for `[TYPE]` tag and `OPEN` status on the same line. Real feature files use a heading-based format (`### [TYPE] Title` on one line, `- **Status:** OPEN` on a separate line), so the checks never matched. Fixed by adding `parse_discovery_entries()` -- a block-level parser that extracts type, title, and status from each discovery entry as a unit. All functions now pre-parse entries once and use structured lookups instead of line-by-line text matching. Test fixtures updated to use the real heading-based format.
 *   **Builder FAIL vs TODO for open BUGs:** `compute_role_status()` incorrectly set builder=FAIL when `has_open_bugs` was True. Per spec Section 2.11, Builder FAIL is specifically "tests.json exists with status FAIL". Open BUGs generate Builder action items (TODO), not test failures (FAIL). Fixed by removing `has_open_bugs` from the FAIL condition — open BUGs now correctly flow through to TODO via the action items path.
 *   **QA role_status FAIL for open BUGs:** BUG resolved 2026-02-20 — QA role_status was computed as TODO instead of FAIL when OPEN BUGs existed. Builder fixed the precedence logic and action item generation. Verified: QA column correctly shows FAIL on dashboard for features with open BUGs.
-*   **SPEC_UPDATED-to-Builder action item routing:** `parse_discovery_entries()` extended to capture the `Action Required` field from discovery entries. `generate_action_items()` now checks SPEC_UPDATED entries for case-insensitive "Builder" substring in `action_required` and generates a MEDIUM-priority Builder item ("Implement fix for \<feature\>: \[title\]"). This flows through `compute_role_status()` via the existing builder action items check, correctly setting `builder=TODO`.
+*   **SPEC_UPDATED-to-Builder action item routing (SUPERSEDED):** Previously, `generate_action_items()` checked SPEC_UPDATED entries for "Builder" in `action_required` and generated Builder items. This was redundant with lifecycle-based Builder signaling (spec edits reset the feature to TODO lifecycle, which gives Builder a TODO). Removed in the "QA Actionability" spec update. SPEC_UPDATED discoveries now only generate QA re-verify items when the feature is in TESTING lifecycle. The `Action Required` field is informational only.
+*   **QA Actionability Principle (spec update 2026-02-20):** Three changes to QA role_status: (1) Removed condition (c) -- HAS_OPEN_ITEMS no longer triggers QA=TODO; OPEN items routing to other roles are not QA-actionable. (2) Made condition (b) lifecycle-dependent -- SPEC_UPDATED re-verify requires TESTING state. (3) Simplified CLEAN -- requires tests.json PASS, no longer requires user_testing==CLEAN. N/A is now a catch-all. This ensures at most one role shows TODO per discovery lifecycle step.
 
 ## User Testing Discoveries
 
