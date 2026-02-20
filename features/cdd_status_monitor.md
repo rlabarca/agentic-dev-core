@@ -303,3 +303,10 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
 *   **Lifecycle Test Timing:** `test_lifecycle.sh` uses `sleep 1` between status tag commits (Ready for Verification -> Complete, Complete -> spec edit) to ensure git commit timestamps differ by at least 1 second, avoiding `int()` truncation equality in the lifecycle comparison logic.
 
 ## User Testing Discoveries
+
+### [DISCOVERY] start.sh requires double invocation to start server (Discovered: 2026-02-20)
+- **Scenario:** NONE
+- **Observed Behavior:** After stopping the CDD server, running `tools/cdd/start.sh` does not reliably start the server on the first invocation. A second run of the script is required to actually start the server. The same behavior is observed with the Software Map start script.
+- **Expected Behavior:** Not specified -- no scenario covers server startup reliability after a stop.
+- **Action Required:** Architect
+- **Status:** OPEN

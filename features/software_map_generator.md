@@ -128,6 +128,13 @@ These scenarios MUST NOT be validated through automated tests. The Builder MUST 
 
 ## User Testing Discoveries
 
+### [DISCOVERY] start.sh requires double invocation to start server (Discovered: 2026-02-20)
+- **Scenario:** NONE
+- **Observed Behavior:** After stopping the Software Map server, running `tools/software_map/start.sh` does not reliably start the server on the first invocation. A second run of the script is required to actually start the server. The same behavior is observed with the CDD start script.
+- **Expected Behavior:** Not specified -- no scenario covers server startup reliability after a stop.
+- **Action Required:** Architect
+- **Status:** OPEN
+
 ### [BUG] Category grouping not updated on reactive refresh (Discovered: 2026-02-20)
 - **Scenario:** Reactive Update on Feature Change
 - **Observed Behavior:** When a feature file's `> Category:` metadata was edited and committed to git while the software map server was running, the web UI continued to display the old category grouping. The node was not moved to the new category group.
