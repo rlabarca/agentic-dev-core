@@ -126,6 +126,14 @@ Consumer projects get 8086/8087 by default (from `agentic_devops.sample/config.j
 flowchart TD
 
 
+    subgraph Coordination_&_Lifecycle [" "]
+        title_Coordination_&_Lifecycle["COORDINATION & LIFECYCLE"]
+        arch_critic_policy["Policy: Critic Coordination Engine<br/><small>arch_critic_policy.md</small>"]
+        title_Coordination_&_Lifecycle ~~~ arch_critic_policy
+        critic_tool["Tool: Critic<br/><small>critic_tool.md</small>"]
+        title_Coordination_&_Lifecycle ~~~ critic_tool
+    end
+
     subgraph DevOps_Tools [" "]
         title_DevOps_Tools["DEVOPS TOOLS"]
         cdd_status_monitor["Tool: CDD Monitor<br/><small>cdd_status_monitor.md</small>"]
@@ -142,17 +150,10 @@ flowchart TD
         title_Initialization_&_Update ~~~ submodule_sync
     end
 
-    subgraph Quality_Assurance [" "]
-        title_Quality_Assurance["QUALITY ASSURANCE"]
-        arch_critic_policy["Policy: Critic Coordination Engine<br/><small>arch_critic_policy.md</small>"]
-        title_Quality_Assurance ~~~ arch_critic_policy
-        critic_tool["Tool: Critic<br/><small>critic_tool.md</small>"]
-        title_Quality_Assurance ~~~ critic_tool
-    end
-
     %% Relationships
     arch_critic_policy --> cdd_status_monitor
     arch_critic_policy --> critic_tool
+    arch_critic_policy --> software_map_generator
     submodule_bootstrap --> submodule_sync
 
     %% Styling Definitions
@@ -164,9 +165,9 @@ flowchart TD
     classDef subgraphTitle fill:none,stroke:none,color:#111,font-size:32px,font-weight:bold;
 
     %% Style Applications
+    class title_Coordination_&_Lifecycle subgraphTitle;
     class title_DevOps_Tools subgraphTitle;
     class title_Initialization_&_Update subgraphTitle;
-    class title_Quality_Assurance subgraphTitle;
 ```
 <!-- MERMAID_END -->
 
