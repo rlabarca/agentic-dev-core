@@ -24,4 +24,4 @@ if [ -f "$SCRIPT_DIR/.agentic_devops/BUILDER_OVERRIDES.md" ]; then
     cat "$SCRIPT_DIR/.agentic_devops/BUILDER_OVERRIDES.md" >> "$PROMPT_FILE"
 fi
 
-claude --append-system-prompt-file "$PROMPT_FILE" --dangerously-skip-permissions
+claude --append-system-prompt-file "$PROMPT_FILE" --dangerously-skip-permissions "Begin Builder session."
