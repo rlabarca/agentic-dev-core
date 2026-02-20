@@ -2383,6 +2383,126 @@ class TestRoleStatusBuilderTODO(unittest.TestCase):
         self.assertEqual(status['builder'], 'TODO')
 
 
+class TestBuilderActionItemsFromLifecycleReset(unittest.TestCase):
+    """Scenario: Builder Action Items from Lifecycle Reset
+
+    When a feature is in TODO lifecycle state per feature_status.json,
+    the Critic generates a HIGH Builder action item to review spec changes.
+    """
+
+    def test_todo_lifecycle_generates_builder_action_item(self):
+        result = _make_base_result()
+        cdd_status = {
+            'features': {
+                'todo': [{'file': 'features/test.md'}],
+                'testing': [], 'complete': [],
+            },
+        }
+        items = generate_action_items(result, cdd_status)
+        builder_items = items['builder']
+        lifecycle_items = [
+            i for i in builder_items if i['category'] == 'lifecycle_reset'
+        ]
+        self.assertEqual(len(lifecycle_items), 1)
+        self.assertEqual(lifecycle_items[0]['priority'], 'HIGH')
+        self.assertIn('Review and implement spec changes', lifecycle_items[0]['description'])
+
+    def test_testing_lifecycle_no_lifecycle_builder_item(self):
+        import critic
+        root = tempfile.mkdtemp()
+        features_dir = os.path.join(root, 'features')
+        os.makedirs(features_dir)
+        with open(os.path.join(features_dir, 'test.md'), 'w') as f:
+            f.write(COMPLETE_FEATURE)
+        orig_features = critic.FEATURES_DIR
+        critic.FEATURES_DIR = features_dir
+        try:
+            result = _make_base_result()
+            cdd_status = {
+                'features': {
+                    'testing': [{'file': 'features/test.md'}],
+                    'todo': [], 'complete': [],
+                },
+            }
+            items = generate_action_items(result, cdd_status)
+            lifecycle_items = [
+                i for i in items['builder'] if i['category'] == 'lifecycle_reset'
+            ]
+            self.assertEqual(len(lifecycle_items), 0)
+        finally:
+            critic.FEATURES_DIR = orig_features
+            shutil.rmtree(root)
+
+    def test_no_cdd_status_skips_lifecycle_item(self):
+        result = _make_base_result()
+        items = generate_action_items(result, cdd_status=None)
+        lifecycle_items = [
+            i for i in items['builder'] if i['category'] == 'lifecycle_reset'
+        ]
+        self.assertEqual(len(lifecycle_items), 0)
+
+
+class TestRoleStatusBuilderLifecycleTODO(unittest.TestCase):
+    """Scenario: Builder Action Items from Lifecycle Reset (role_status)
+
+    When a feature is in TODO lifecycle state, role_status.builder is TODO
+    regardless of passing tests and traceability.
+    """
+
+    def test_todo_lifecycle_makes_builder_todo(self):
+        result = _make_base_result()
+        cdd_status = {
+            'features': {
+                'todo': [{'file': 'features/test.md'}],
+                'testing': [], 'complete': [],
+            },
+        }
+        status = compute_role_status(result, cdd_status)
+        self.assertEqual(status['builder'], 'TODO')
+
+    def test_complete_lifecycle_allows_builder_done(self):
+        result = _make_base_result()
+        cdd_status = {
+            'features': {
+                'complete': [{'file': 'features/test.md'}],
+                'testing': [], 'todo': [],
+            },
+        }
+        status = compute_role_status(result, cdd_status)
+        self.assertEqual(status['builder'], 'DONE')
+
+
+class TestRoleStatusQATODOForTestingFeature(unittest.TestCase):
+    """Scenario: Role Status QA TODO for TESTING Feature
+
+    A feature in TESTING state with CLEAN user testing should have
+    role_status.qa = TODO (not CLEAN), because QA hasn't verified yet.
+    """
+
+    def test_testing_state_clean_user_testing_makes_qa_todo(self):
+        result = _make_base_result()
+        cdd_status = {
+            'features': {
+                'testing': [{'file': 'features/test.md'}],
+                'complete': [], 'todo': [],
+            },
+        }
+        status = compute_role_status(result, cdd_status)
+        self.assertEqual(status['qa'], 'TODO')
+        self.assertNotEqual(status['qa'], 'CLEAN')
+
+    def test_complete_state_clean_user_testing_makes_qa_clean(self):
+        result = _make_base_result()
+        cdd_status = {
+            'features': {
+                'complete': [{'file': 'features/test.md'}],
+                'testing': [], 'todo': [],
+            },
+        }
+        status = compute_role_status(result, cdd_status)
+        self.assertEqual(status['qa'], 'CLEAN')
+
+
 # ===================================================================
 # Test runner with output to tests/critic_tool/tests.json
 # ===================================================================

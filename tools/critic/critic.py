@@ -765,6 +765,19 @@ def generate_action_items(feature_result, cdd_status=None):
                 })
 
     # --- Builder items ---
+    # Feature in TODO lifecycle state -> HIGH (spec modified, needs review)
+    if cdd_status is not None:
+        lifecycle_state = _get_feature_lifecycle_state(feature_file, cdd_status)
+        if lifecycle_state == 'todo':
+            builder_items.append({
+                'priority': 'HIGH',
+                'category': 'lifecycle_reset',
+                'feature': feature_name,
+                'description': (
+                    f'Review and implement spec changes for {feature_name}'
+                ),
+            })
+
     # Structural completeness FAIL -> HIGH
     struct = impl_gate['checks'].get('structural_completeness', {})
     if struct.get('status') == 'FAIL':
@@ -995,6 +1008,10 @@ def compute_role_status(feature_result, cdd_status=None):
     trace = impl_gate['checks'].get('traceability', {})
     has_trace_fail = trace.get('status') == 'FAIL'
 
+    # Lifecycle state (shared by Builder + QA status computation)
+    lifecycle_state = _get_feature_lifecycle_state(feature_file, cdd_status)
+    lifecycle_is_todo = lifecycle_state == 'todo'
+
     # Apply precedence: INFEASIBLE > BLOCKED > FAIL > TODO > DONE
     if has_infeasible:
         builder_status = 'INFEASIBLE'
@@ -1009,6 +1026,9 @@ def compute_role_status(feature_result, cdd_status=None):
             builder_status = 'TODO'
     elif has_open_bugs or has_trace_fail:
         builder_status = 'FAIL' if has_open_bugs else 'TODO'
+    elif lifecycle_is_todo:
+        # Spec modified after last status commit -- implementation review needed
+        builder_status = 'TODO'
     elif struct_status == 'PASS' and not has_open_bugs:
         # Check if there are any Builder action items
         builder_items = action_items.get('builder', [])
@@ -1017,8 +1037,6 @@ def compute_role_status(feature_result, cdd_status=None):
         builder_status = 'TODO'
 
     # --- QA status ---
-    lifecycle_state = _get_feature_lifecycle_state(feature_file, cdd_status)
-
     if lifecycle_state is None:
         # No CDD status available; default to N/A
         qa_status = 'N/A'
@@ -1054,8 +1072,12 @@ def compute_role_status(feature_result, cdd_status=None):
             qa_status = 'DISPUTED'
         elif user_testing['status'] == 'HAS_OPEN_ITEMS':
             qa_status = 'TODO'
-        else:
+        elif lifecycle_state == 'complete':
+            # Only COMPLETE features can be CLEAN
             qa_status = 'CLEAN'
+        else:
+            # TESTING state -- awaiting QA verification
+            qa_status = 'TODO'
 
     return {
         'architect': architect_status,
