@@ -2,6 +2,18 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-20] Critic Spec Gate: Eliminate False-Positive WARNs
+
+- **Problem:** The Critic Spec Gate produced persistent LOW-priority WARNs for features with legitimate states: (1) `scenario_classification` flagged features that explicitly declared "None" for Manual Scenarios as "Only Automated subsection present." (2) `policy_anchoring` flagged features with valid non-arch_*.md prerequisites as "Has prerequisite but not linked to policy file." These WARNs appeared every Architect session startup, masking a clean project state.
+- **Root Cause:** The `scenario_classification` PASS condition required both subsections to have content, without recognizing explicit opt-out declarations. The `policy_anchoring` PASS condition required an arch_*.md link specifically, treating any other prerequisite as insufficient grounding.
+- **Solution:**
+    - **scenario_classification:** PASS now accepts "Both subsections present (with content or explicit 'None' declaration)." Features that deliberately have no manual scenarios pass clean.
+    - **policy_anchoring:** PASS now accepts "Has prerequisite to non-policy file (feature is grounded)." Features linked to instruction files or other features are considered architecturally grounded. WARN is reserved for features with NO prerequisites at all.
+    - **Scenario fix:** "Spec Gate No Prerequisite on Non-Policy" corrected from FAIL to WARN (matched the table definition, scenario was inconsistent).
+    - **New scenarios:** "Spec Gate Non-Policy Prerequisite" (PASS), "Scenario Classification Explicit None for Manual" (PASS).
+- **Files Modified:** `features/critic_tool.md` (Section 2.1 table, 1 fixed scenario, 2 new scenarios, implementation notes), `PROCESS_HISTORY.md`.
+- **Impact:** Feature spec reset to TODO. Builder must implement: update `scenario_classification` check to recognize explicit "None" opt-outs, update `policy_anchoring` to accept non-arch_*.md prerequisites as PASS, fix "no prerequisite" from FAIL to WARN.
+
 ## [2026-02-20] QA Actionability: SPEC_UPDATED Lifecycle Routing + QA Status Simplification
 
 - **Problem:** SPEC_UPDATED discoveries with `Action Required: Builder` generated Builder action items, keeping Builder=TODO even after the Builder had committed. Both `cdd_status_monitor` and `critic_tool` showed Builder=TODO when QA was the role that needed to act next. Additionally, QA=TODO triggered for OPEN items routing to Architect (condition c: HAS_OPEN_ITEMS), making the dashboard ambiguous about which agent to run.

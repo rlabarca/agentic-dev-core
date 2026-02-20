@@ -17,8 +17,8 @@ Architectural policy files (`arch_*.md`) receive a REDUCED Spec Gate evaluation.
 | Check | PASS | WARN | FAIL |
 |-------|------|------|------|
 | Section completeness | All required sections present (Overview, Requirements, Scenarios) | Implementation Notes empty | Missing Overview, Requirements, or Scenarios |
-| Scenario classification | Both Automated + Manual subsections present | Only one subsection | No scenarios at all |
-| Policy anchoring | Has `> Prerequisite:` linking to `arch_*.md` | Has prerequisite but not to a policy file; OR no prerequisite (unless IS a policy file) | Referenced prerequisite file missing on disk |
+| Scenario classification | Both subsections present (with content or explicit "None" declaration) | Only one subsection with no explicit opt-out for the other | No scenarios at all |
+| Policy anchoring | Has `> Prerequisite:` linking to `arch_*.md`; OR has prerequisite to non-policy file (feature is grounded) | No prerequisite (unless IS a policy file) | Referenced prerequisite file missing on disk |
 | Prerequisite integrity | All referenced prerequisite files exist on disk | N/A | Referenced file missing |
 | Gherkin quality | All scenarios have Given/When/Then | Some scenarios missing steps | N/A (degrades to WARN) |
 
@@ -220,10 +220,21 @@ The Critic MUST detect untracked files in the working directory and generate Arc
     When the Critic tool runs the Spec Gate
     Then policy_anchoring reports PASS
 
+#### Scenario: Spec Gate Non-Policy Prerequisite
+    Given a feature file has a Prerequisite link to another feature file (not arch_*.md)
+    When the Critic tool runs the Spec Gate
+    Then policy_anchoring reports PASS
+
 #### Scenario: Spec Gate No Prerequisite on Non-Policy
     Given a non-policy feature file has no Prerequisite link
     When the Critic tool runs the Spec Gate
-    Then policy_anchoring reports FAIL
+    Then policy_anchoring reports WARN
+
+#### Scenario: Scenario Classification Explicit None for Manual
+    Given a feature file has Automated Scenarios with content
+    And the Manual Scenarios subsection explicitly declares "None"
+    When the Critic tool runs the Spec Gate
+    Then scenario_classification reports PASS
 
 #### Scenario: Spec Gate Policy File Is Exempt
     Given a feature file is itself an architectural policy (arch_*.md)
@@ -526,5 +537,6 @@ The Critic MUST detect untracked files in the working directory and generate Arc
 *   **QA Actionability Principle (spec update 2026-02-20):** Three changes to QA role_status: (1) Removed condition (c) -- HAS_OPEN_ITEMS no longer triggers QA=TODO; OPEN items routing to other roles are not QA-actionable. (2) Made condition (b) lifecycle-dependent -- SPEC_UPDATED re-verify requires TESTING state. (3) Simplified CLEAN -- requires tests.json PASS, no longer requires user_testing==CLEAN. N/A is now a catch-all. This ensures at most one role shows TODO per discovery lifecycle step.
 *   **QA Actionability Implementation (2026-02-20):** Implemented all three QA Actionability changes in `critic.py`: (1) Deleted SPEC_UPDATED-to-Builder action item routing block from `generate_action_items()`. (2) Made SPEC_UPDATED QA re-verify items conditional on TESTING lifecycle in both `generate_action_items()` and `compute_role_status()`. (3) Removed condition (c) and simplified CLEAN check in `compute_role_status()`. Also hoisted `lifecycle_state` computation in `generate_action_items()` to share between Builder and QA item generation. All 148 unit tests + lifecycle integration test pass.
 *   **SPEC_UPDATED Builder routing discovery:** DISCOVERY resolved 2026-02-20 — spec updated to decouple SPEC_UPDATED discoveries from Builder action items. Builder signaling now comes exclusively from lifecycle state (TODO reset), not discovery routing. Verified working as designed.
+*   **False-positive WARN elimination (spec update 2026-02-20):** Two Spec Gate checks produced WARNs for legitimate feature states: (1) scenario_classification flagged features with explicit "None" manual scenarios as "only one subsection" — updated PASS to accept explicit "None" declarations. (2) policy_anchoring flagged features with non-arch_*.md prerequisites as "not linked to policy file" — updated PASS to accept any valid prerequisite (feature is grounded via non-policy dependency). Also fixed scenario "Spec Gate No Prerequisite on Non-Policy" from FAIL to WARN to match the table definition. Added two new scenarios: "Spec Gate Non-Policy Prerequisite" (PASS) and "Scenario Classification Explicit None for Manual" (PASS).
 
 ## User Testing Discoveries
