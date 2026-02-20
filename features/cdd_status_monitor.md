@@ -317,9 +317,9 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
 
 ## User Testing Discoveries
 
-### [DISCOVERY] start.sh requires double invocation to start server (Discovered: 2026-02-20)
-- **Scenario:** NONE
-- **Observed Behavior:** After stopping the CDD server, running `tools/cdd/start.sh` does not reliably start the server on the first invocation. A second run of the script is required to actually start the server. The same behavior is observed with the Software Map start script.
-- **Expected Behavior:** Not specified -- no scenario covers server startup reliability after a stop.
-- **Action Required:** Architect
+### [DISCOVERY] start.sh requires multiple invocations to start server after stop (Discovered: 2026-02-20)
+- **Scenario:** Server Start/Stop Lifecycle
+- **Observed Behavior:** After stopping the CDD server, running `tools/cdd/start.sh` does not reliably start the server on the first invocation. Required 2-4 attempts in testing. stop.sh correctly reports the killed PID, and cdd.log is empty (no errors). The script reports "CDD Monitor started on port 9086 (PID: XXXX)" each time, but the process silently dies. Likely cause: the port remains in TIME_WAIT state after the process is killed, so start.sh spawns a process that fails to bind and exits immediately. The Software Map server does NOT have this issue — its start/stop lifecycle passes on first invocation. Note: the original PID path mismatch (start.sh vs stop.sh) appears fixed, but the port release timing issue persists for CDD only.
+- **Expected Behavior:** Server starts on first invocation after a stop. start.sh should either wait for port release or detect and report the bind failure.
+- **Action Required:** Builder
 - **Status:** SPEC_UPDATED
