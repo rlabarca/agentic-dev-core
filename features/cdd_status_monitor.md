@@ -315,12 +315,6 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
 *   **Lifecycle Test Timing:** `test_lifecycle.sh` uses `sleep 1` between status tag commits (Ready for Verification -> Complete, Complete -> spec edit) to ensure git commit timestamps differ by at least 1 second, avoiding `int()` truncation equality in the lifecycle comparison logic.
 *   **Run Critic Button:** BUG resolved 2026-02-20 — button was missing from dashboard, Builder added it. Verified: displays in top-right, enters loading state on click, refreshes dashboard with updated role columns.
 *   **Port TIME_WAIT fix:** Set `allow_reuse_address = True` on `socketserver.TCPServer` in `serve.py` so the server can rebind to a port in TIME_WAIT state after stop/restart. Also added startup verification to `start.sh` — waits 0.5s and checks if the PID is still alive, reporting an error with log path if the process exited (e.g., bind failure).
+*   **start.sh multi-invocation issue:** DISCOVERY resolved 2026-02-20 — port TIME_WAIT fix and startup verification resolved the need for multiple start.sh invocations after stop. Server now starts reliably on first invocation.
 
 ## User Testing Discoveries
-
-### [DISCOVERY] start.sh requires multiple invocations to start server after stop (Discovered: 2026-02-20)
-- **Scenario:** Server Start/Stop Lifecycle
-- **Observed Behavior:** After stopping the CDD server, running `tools/cdd/start.sh` does not reliably start the server on the first invocation. Required 2-4 attempts in testing. stop.sh correctly reports the killed PID, and cdd.log is empty (no errors). The script reports "CDD Monitor started on port 9086 (PID: XXXX)" each time, but the process silently dies. Likely cause: the port remains in TIME_WAIT state after the process is killed, so start.sh spawns a process that fails to bind and exits immediately. The Software Map server does NOT have this issue — its start/stop lifecycle passes on first invocation. Note: the original PID path mismatch (start.sh vs stop.sh) appears fixed, but the port release timing issue persists for CDD only.
-- **Expected Behavior:** Server starts on first invocation after a stop. start.sh should either wait for port release or detect and report the bind failure.
-- **Action Required:** Builder
-- **Status:** SPEC_UPDATED
