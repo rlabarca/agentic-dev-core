@@ -2,6 +2,19 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-20] Python Environment Isolation for Submodule Consumers
+
+- **Problem:** 2 of 7 shell scripts (`cdd/start.sh`, `software_map/start.sh`) had ad-hoc venv detection while the other 5 (`critic/run.sh`, `cdd/status.sh`, `bootstrap.sh`, `cdd/test_lifecycle.sh`, `cdd/stop.sh`) used bare `python3`. If a consumer creates a `.venv/` (e.g., to install the optional `anthropic` SDK for LLM-based logic drift), only the server scripts find it. The remaining scripts silently use system Python, creating a split-brain execution environment.
+- **Solution:**
+    - **New feature spec** (`features/python_environment.md`): Defines a shared Python resolution helper (`tools/resolve_python.sh`), migration of all 7 shell scripts to use it, dependency manifests (`requirements.txt`, `requirements-optional.txt`), and a bootstrap venv suggestion.
+    - **Resolution priority:** `$AGENTIC_PYTHON` env var > `$AGENTIC_PROJECT_ROOT/.venv/` > climbing detection from script dir > system `python3` > system `python`. Cross-platform venv paths (Unix `.venv/bin/python3`, MSYS/MinGW `.venv/Scripts/python.exe`). Diagnostics to stderr only (no stdout pollution).
+    - **Dependency manifests:** `requirements.txt` (empty/comment-only, establishes convention), `requirements-optional.txt` (`anthropic>=0.18.0`). Framework has zero required Python dependencies.
+    - **Bootstrap venv suggestion** (`features/submodule_bootstrap.md` Section 2.16): After bootstrap completes, print optional venv setup guidance if `.venv/` does not exist. Informational only -- bootstrap does not fail without Python or a venv.
+    - **README.md:** Added "Python Environment (Optional)" section documenting venv setup, resolution priority, and cross-platform notes.
+- **Files Created:** `features/python_environment.md`.
+- **Files Modified:** `features/submodule_bootstrap.md` (added Section 2.16), `README.md` (added Python Environment section), `PROCESS_HISTORY.md`.
+- **Impact:** New feature spec in [TODO] state. `submodule_bootstrap.md` reset to [TODO]. Builder must implement: `tools/resolve_python.sh`, migrate 7 shell scripts, create dependency manifests, add bootstrap venv suggestion, and add test scenarios.
+
 ## [2026-02-20] Critic Spec Gate: Eliminate False-Positive WARNs
 
 - **Problem:** The Critic Spec Gate produced persistent LOW-priority WARNs for features with legitimate states: (1) `scenario_classification` flagged features that explicitly declared "None" for Manual Scenarios as "Only Automated subsection present." (2) `policy_anchoring` flagged features with valid non-arch_*.md prerequisites as "Has prerequisite but not linked to policy file." These WARNs appeared every Architect session startup, masking a clean project state.

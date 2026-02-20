@@ -104,6 +104,12 @@ Initializes a consumer project that has added `agentic-dev-core` as a git submod
 *   **Sandbox Cleanup:** The test harness MUST clean up all temporary directories on exit (via `trap` or equivalent), even on test failure.
 *   **Dual-Layout Coverage:** Where feasible, tests SHOULD run the same assertions in both standalone layout (tools at `<root>/tools/`) and submodule layout (tools at `<root>/agentic-dev/tools/`) to catch layout-dependent regressions.
 
+### 2.16 Python Environment Suggestion
+*   **Trigger:** After the summary output (Section 2.8), if `.venv/` does not exist at the consumer project root.
+*   **Content:** The bootstrap script MUST print an informational message suggesting optional venv creation and installation of optional dependencies from the submodule's `requirements-optional.txt`.
+*   **Non-Blocking:** The suggestion is purely informational. Bootstrap MUST NOT fail if Python is unavailable, if venv creation is skipped, or if `.venv/` does not exist. Bootstrap success is independent of the Python environment.
+*   **Suppression:** If `.venv/` already exists at the project root, the suggestion MUST NOT be printed.
+
 ## 3. Scenarios
 
 ### Automated Scenarios

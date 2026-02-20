@@ -85,6 +85,27 @@ There is no separate "test status" indicator. Builder status reflects test *heal
 
     All three launchers (`run_claude_architect.sh`, `run_claude_builder.sh`, `run_claude_qa.sh`) are available in standalone mode.
 
+### Python Environment (Optional)
+
+The framework's Python tools use only the standard library -- no packages need to be installed for core functionality. However, optional features (e.g., LLM-based logic drift detection in the Critic) require third-party packages.
+
+All tool scripts auto-detect a `.venv/` at the project root. To set up:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r agentic-dev/requirements-optional.txt   # submodule
+# or
+.venv/bin/pip install -r requirements-optional.txt               # standalone
+```
+
+No additional configuration is needed -- all shell scripts that invoke Python use a shared resolver (`tools/resolve_python.sh`) that checks for the venv automatically. The resolution priority is:
+1. `$AGENTIC_PYTHON` env var (explicit override)
+2. `$AGENTIC_PROJECT_ROOT/.venv/`
+3. Climbing detection from script directory
+4. System `python3`, then `python`
+
+This works on macOS, Linux, and Windows via WSL or Git Bash. Native PowerShell is not supported.
+
 ### Updating the Submodule
 
 ```bash
@@ -151,6 +172,8 @@ flowchart TD
 
     subgraph Initialization_&_Update [" "]
         title_Initialization_&_Update["INITIALIZATION & UPDATE"]
+        python_environment["Tool: Python Environment<br/><small>python_environment.md</small>"]
+        title_Initialization_&_Update ~~~ python_environment
         submodule_bootstrap["Tool: Bootstrap<br/><small>submodule_bootstrap.md</small>"]
         title_Initialization_&_Update ~~~ submodule_bootstrap
         submodule_sync["Tool: Upstream Sync<br/><small>submodule_sync.md</small>"]
@@ -160,6 +183,7 @@ flowchart TD
     %% Relationships
     arch_critic_policy --> cdd_status_monitor
     arch_critic_policy --> critic_tool
+    submodule_bootstrap --> python_environment
     arch_critic_policy --> software_map_generator
     submodule_bootstrap --> submodule_sync
 
