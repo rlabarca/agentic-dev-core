@@ -313,6 +313,7 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
 *   **CLI Mode:** `serve.py --cli-status` outputs API JSON to stdout and regenerates `feature_status.json`. `status.sh` is a shell wrapper that detects project root and calls this mode.
 *   **Start/Stop PID Path Consistency:** `start.sh` writes PID files to `.agentic_devops/runtime/`. `stop.sh` MUST read from the same runtime directory using the same project root detection logic. A path mismatch between start and stop causes orphaned server processes and port conflicts on subsequent starts.
 *   **Lifecycle Test Timing:** `test_lifecycle.sh` uses `sleep 1` between status tag commits (Ready for Verification -> Complete, Complete -> spec edit) to ensure git commit timestamps differ by at least 1 second, avoiding `int()` truncation equality in the lifecycle comparison logic.
+*   **Run Critic Button:** BUG resolved 2026-02-20 — button was missing from dashboard, Builder added it. Verified: displays in top-right, enters loading state on click, refreshes dashboard with updated role columns.
 
 ## User Testing Discoveries
 
@@ -322,10 +323,3 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
 - **Expected Behavior:** Not specified -- no scenario covers server startup reliability after a stop.
 - **Action Required:** Architect
 - **Status:** SPEC_UPDATED
-
-### [BUG] Run Critic button missing from dashboard (Discovered: 2026-02-20)
-- **Scenario:** Run Critic Button
-- **Observed Behavior:** The CDD web dashboard does not have a "Run Critic" button in the top-right area next to the last-updated timestamp. The button is entirely absent from the UI.
-- **Expected Behavior:** Per the "Run Critic Button" manual scenario, a "Run Critic" button should be visible in the top-right area. Clicking it should run the Critic, enter a loading state, then refresh the dashboard with updated role status columns.
-- **Action Required:** Builder
-- **Status:** RESOLVED
