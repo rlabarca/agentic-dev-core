@@ -20,9 +20,12 @@ sys.path.insert(0, SCRIPT_DIR)
 from traceability import (
     extract_keywords,
     extract_test_functions,
+    extract_bash_test_scenarios,
+    extract_test_entries,
     match_scenario_to_tests,
     parse_traceability_overrides,
     run_traceability,
+    discover_test_files,
 )
 from policy_check import (
     discover_forbidden_patterns,
@@ -47,6 +50,7 @@ from critic import (
     check_builder_decisions,
     check_logic_drift,
     run_user_testing_audit,
+    generate_action_items,
     generate_critic_json,
     generate_critic_report,
     _policy_exempt_implementation_gate,
@@ -1135,6 +1139,569 @@ class TestPolicyAnchoringMissingPrereqFile(unittest.TestCase):
         content = '# Feature: No Prereq\n'
         result = check_policy_anchoring(content, 'some_feature.md')
         self.assertEqual(result['status'], 'WARN')
+
+
+# ===================================================================
+# Bash Test File Discovery and Scenario Parsing Tests
+# ===================================================================
+
+class TestBashTestFileDiscovery(unittest.TestCase):
+    """Scenario: Bash Test File Discovery"""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.test_dir = os.path.join(self.root, 'tests', 'my_feature')
+        os.makedirs(self.test_dir)
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def test_discovers_both_py_and_sh(self):
+        with open(os.path.join(self.test_dir, 'test_feature.py'), 'w') as f:
+            f.write('def test_something(): pass\n')
+        with open(os.path.join(self.test_dir, 'test_feature.sh'), 'w') as f:
+            f.write('echo "[Scenario] Test Something"\n')
+        files = discover_test_files(self.root, 'my_feature', tools_root='tools')
+        extensions = {os.path.splitext(f)[1] for f in files}
+        self.assertIn('.py', extensions)
+        self.assertIn('.sh', extensions)
+
+    def test_discovers_sh_only(self):
+        with open(os.path.join(self.test_dir, 'test_feature.sh'), 'w') as f:
+            f.write('echo "[Scenario] Test Something"\n')
+        files = discover_test_files(self.root, 'my_feature', tools_root='tools')
+        self.assertEqual(len(files), 1)
+        self.assertTrue(files[0].endswith('.sh'))
+
+
+class TestBashScenarioExtraction(unittest.TestCase):
+    """Scenario: Bash Scenario Keyword Matching"""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def test_extracts_scenarios(self):
+        path = os.path.join(self.test_dir, 'test_bootstrap.sh')
+        with open(path, 'w') as f:
+            f.write(
+                '#!/bin/bash\n'
+                'echo "[Scenario] Bootstrap Consumer Project"\n'
+                'setup_sandbox\n'
+                'run_test\n'
+                '\n'
+                'echo "[Scenario] Re-Bootstrap Existing Project"\n'
+                'setup_again\n'
+                'run_again\n'
+            )
+        entries = extract_bash_test_scenarios(path)
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[0]['name'], 'Bootstrap Consumer Project')
+        self.assertEqual(entries[1]['name'], 'Re-Bootstrap Existing Project')
+        self.assertIn('setup_sandbox', entries[0]['body'])
+        self.assertIn('setup_again', entries[1]['body'])
+
+    def test_single_scenario(self):
+        path = os.path.join(self.test_dir, 'test_single.sh')
+        with open(path, 'w') as f:
+            f.write(
+                '#!/bin/bash\n'
+                'echo "[Scenario] Single Test"\n'
+                'do_something\n'
+                'assert_result\n'
+            )
+        entries = extract_bash_test_scenarios(path)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]['name'], 'Single Test')
+        self.assertIn('assert_result', entries[0]['body'])
+
+    def test_no_scenarios(self):
+        path = os.path.join(self.test_dir, 'test_empty.sh')
+        with open(path, 'w') as f:
+            f.write('#!/bin/bash\necho "Just a script"\n')
+        entries = extract_bash_test_scenarios(path)
+        self.assertEqual(entries, [])
+
+    def test_nonexistent_file(self):
+        entries = extract_bash_test_scenarios('/nonexistent/file.sh')
+        self.assertEqual(entries, [])
+
+    def test_keyword_matching_with_bash_entry(self):
+        """Verify bash scenario entries can match feature scenario keywords."""
+        keywords = {'bootstrap', 'consumer', 'project'}
+        entries = [{'name': 'Bootstrap Consumer Project',
+                    'body': 'echo "[Scenario] Bootstrap Consumer Project"\nsetup\n'}]
+        matches = match_scenario_to_tests(keywords, entries)
+        self.assertEqual(len(matches), 1)
+
+
+class TestExtractTestEntries(unittest.TestCase):
+    """Test the extract_test_entries dispatcher."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def test_dispatches_python(self):
+        path = os.path.join(self.test_dir, 'test_sample.py')
+        with open(path, 'w') as f:
+            f.write('def test_alpha():\n    assert True\n')
+        entries = extract_test_entries(path)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]['name'], 'test_alpha')
+
+    def test_dispatches_bash(self):
+        path = os.path.join(self.test_dir, 'test_sample.sh')
+        with open(path, 'w') as f:
+            f.write('echo "[Scenario] Alpha Test"\ndo_thing\n')
+        entries = extract_test_entries(path)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]['name'], 'Alpha Test')
+
+    def test_unknown_extension(self):
+        path = os.path.join(self.test_dir, 'test_sample.rb')
+        with open(path, 'w') as f:
+            f.write('# ruby test\n')
+        entries = extract_test_entries(path)
+        self.assertEqual(entries, [])
+
+
+# ===================================================================
+# Action Item Generation Tests
+# ===================================================================
+
+class TestActionItemsArchitect(unittest.TestCase):
+    """Scenario: Architect Action Items from Spec Gaps"""
+
+    def test_spec_fail_generates_high_item(self):
+        result = {
+            'feature_file': 'features/test.md',
+            'spec_gate': {
+                'status': 'FAIL',
+                'checks': {
+                    'section_completeness': {
+                        'status': 'FAIL',
+                        'detail': 'Missing sections: Requirements.',
+                    },
+                    'scenario_classification': {'status': 'PASS', 'detail': 'OK'},
+                    'policy_anchoring': {'status': 'PASS', 'detail': 'OK'},
+                    'prerequisite_integrity': {'status': 'PASS', 'detail': 'OK'},
+                    'gherkin_quality': {'status': 'PASS', 'detail': 'OK'},
+                },
+            },
+            'implementation_gate': {
+                'status': 'PASS',
+                'checks': {
+                    'traceability': {'status': 'PASS', 'coverage': 1.0, 'detail': 'OK'},
+                    'policy_adherence': {'status': 'PASS', 'violations': [], 'detail': 'OK'},
+                    'structural_completeness': {'status': 'PASS', 'detail': 'OK'},
+                    'builder_decisions': {
+                        'status': 'PASS',
+                        'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                                    'DEVIATION': 0, 'DISCOVERY': 0},
+                        'detail': 'OK',
+                    },
+                    'logic_drift': {'status': 'PASS', 'pairs': [], 'detail': 'OK'},
+                },
+            },
+            'user_testing': {'status': 'CLEAN', 'bugs': 0,
+                             'discoveries': 0, 'intent_drifts': 0},
+        }
+        items = generate_action_items(result)
+        arch_items = items['architect']
+        self.assertTrue(len(arch_items) > 0)
+        self.assertEqual(arch_items[0]['priority'], 'HIGH')
+        self.assertIn('section_completeness', arch_items[0]['description'])
+
+    def test_spec_warn_generates_low_item(self):
+        result = {
+            'feature_file': 'features/test.md',
+            'spec_gate': {
+                'status': 'WARN',
+                'checks': {
+                    'section_completeness': {
+                        'status': 'WARN',
+                        'detail': 'Implementation Notes empty.',
+                    },
+                    'scenario_classification': {'status': 'PASS', 'detail': 'OK'},
+                    'policy_anchoring': {'status': 'PASS', 'detail': 'OK'},
+                    'prerequisite_integrity': {'status': 'PASS', 'detail': 'OK'},
+                    'gherkin_quality': {'status': 'PASS', 'detail': 'OK'},
+                },
+            },
+            'implementation_gate': {
+                'status': 'PASS',
+                'checks': {
+                    'traceability': {'status': 'PASS', 'coverage': 1.0, 'detail': 'OK'},
+                    'policy_adherence': {'status': 'PASS', 'violations': [], 'detail': 'OK'},
+                    'structural_completeness': {'status': 'PASS', 'detail': 'OK'},
+                    'builder_decisions': {
+                        'status': 'PASS',
+                        'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                                    'DEVIATION': 0, 'DISCOVERY': 0},
+                        'detail': 'OK',
+                    },
+                    'logic_drift': {'status': 'PASS', 'pairs': [], 'detail': 'OK'},
+                },
+            },
+            'user_testing': {'status': 'CLEAN', 'bugs': 0,
+                             'discoveries': 0, 'intent_drifts': 0},
+        }
+        items = generate_action_items(result)
+        arch_items = items['architect']
+        self.assertTrue(len(arch_items) > 0)
+        self.assertEqual(arch_items[0]['priority'], 'LOW')
+
+
+class TestActionItemsBuilder(unittest.TestCase):
+    """Scenario: Builder Action Items from Traceability Gaps"""
+
+    def test_traceability_gap_generates_medium_item(self):
+        result = {
+            'feature_file': 'features/test.md',
+            'spec_gate': {'status': 'PASS', 'checks': {}},
+            'implementation_gate': {
+                'status': 'WARN',
+                'checks': {
+                    'traceability': {
+                        'status': 'WARN',
+                        'coverage': 0.5,
+                        'detail': '1/2 traced. Unmatched: Zero-Queue Verification',
+                    },
+                    'policy_adherence': {'status': 'PASS', 'violations': [], 'detail': 'OK'},
+                    'structural_completeness': {'status': 'PASS', 'detail': 'OK'},
+                    'builder_decisions': {
+                        'status': 'PASS',
+                        'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                                    'DEVIATION': 0, 'DISCOVERY': 0},
+                        'detail': 'OK',
+                    },
+                    'logic_drift': {'status': 'PASS', 'pairs': [], 'detail': 'OK'},
+                },
+            },
+            'user_testing': {'status': 'CLEAN', 'bugs': 0,
+                             'discoveries': 0, 'intent_drifts': 0},
+        }
+        items = generate_action_items(result)
+        builder_items = items['builder']
+        self.assertTrue(len(builder_items) > 0)
+        self.assertEqual(builder_items[0]['priority'], 'MEDIUM')
+        self.assertIn('Write tests', builder_items[0]['description'])
+
+    def test_structural_fail_generates_high_item(self):
+        result = {
+            'feature_file': 'features/test.md',
+            'spec_gate': {'status': 'PASS', 'checks': {}},
+            'implementation_gate': {
+                'status': 'FAIL',
+                'checks': {
+                    'traceability': {'status': 'PASS', 'coverage': 1.0, 'detail': 'OK'},
+                    'policy_adherence': {'status': 'PASS', 'violations': [], 'detail': 'OK'},
+                    'structural_completeness': {
+                        'status': 'FAIL',
+                        'detail': 'Missing tests/test/tests.json.',
+                    },
+                    'builder_decisions': {
+                        'status': 'PASS',
+                        'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                                    'DEVIATION': 0, 'DISCOVERY': 0},
+                        'detail': 'OK',
+                    },
+                    'logic_drift': {'status': 'PASS', 'pairs': [], 'detail': 'OK'},
+                },
+            },
+            'user_testing': {'status': 'CLEAN', 'bugs': 0,
+                             'discoveries': 0, 'intent_drifts': 0},
+        }
+        items = generate_action_items(result)
+        builder_items = items['builder']
+        self.assertTrue(len(builder_items) > 0)
+        self.assertEqual(builder_items[0]['priority'], 'HIGH')
+        self.assertIn('Fix failing tests', builder_items[0]['description'])
+
+    def test_unacknowledged_deviation_generates_high_item(self):
+        result = {
+            'feature_file': 'features/test.md',
+            'spec_gate': {'status': 'PASS', 'checks': {}},
+            'implementation_gate': {
+                'status': 'FAIL',
+                'checks': {
+                    'traceability': {'status': 'PASS', 'coverage': 1.0, 'detail': 'OK'},
+                    'policy_adherence': {'status': 'PASS', 'violations': [], 'detail': 'OK'},
+                    'structural_completeness': {'status': 'PASS', 'detail': 'OK'},
+                    'builder_decisions': {
+                        'status': 'FAIL',
+                        'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                                    'DEVIATION': 1, 'DISCOVERY': 0},
+                        'detail': 'Has DEVIATION.',
+                    },
+                    'logic_drift': {'status': 'PASS', 'pairs': [], 'detail': 'OK'},
+                },
+            },
+            'user_testing': {'status': 'CLEAN', 'bugs': 0,
+                             'discoveries': 0, 'intent_drifts': 0},
+        }
+        items = generate_action_items(result)
+        builder_items = items['builder']
+        deviation_items = [i for i in builder_items if 'DEVIATION' in i['description']]
+        self.assertTrue(len(deviation_items) > 0)
+        self.assertEqual(deviation_items[0]['priority'], 'HIGH')
+
+
+class TestActionItemsQA(unittest.TestCase):
+    """Scenario: QA Action Items from TESTING Status"""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.features_dir = os.path.join(self.root, 'features')
+        os.makedirs(self.features_dir)
+        feature_content = """\
+# Feature: Test
+
+> Label: "Tool: Test"
+
+## 1. Overview
+Overview.
+
+## 2. Requirements
+Reqs.
+
+## 3. Scenarios
+
+### Automated Scenarios
+
+#### Scenario: Auto Test
+    Given X
+    When Y
+    Then Z
+
+### Manual Scenarios (Human Verification Required)
+
+#### Scenario: Manual One
+    Given A
+    When B
+    Then C
+
+#### Scenario: Manual Two
+    Given D
+    When E
+    Then F
+
+## 4. Implementation Notes
+* Note.
+"""
+        with open(os.path.join(self.features_dir, 'test.md'), 'w') as f:
+            f.write(feature_content)
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def test_testing_status_generates_qa_item(self):
+        import critic
+        orig_features = critic.FEATURES_DIR
+        critic.FEATURES_DIR = self.features_dir
+        try:
+            cdd_status = {
+                'features': {
+                    'testing': [{'file': 'features/test.md', 'label': 'Test'}],
+                    'todo': [],
+                    'complete': [],
+                },
+            }
+            result = {
+                'feature_file': 'features/test.md',
+                'spec_gate': {'status': 'PASS', 'checks': {}},
+                'implementation_gate': {
+                    'status': 'PASS',
+                    'checks': {
+                        'traceability': {'status': 'PASS', 'coverage': 1.0, 'detail': 'OK'},
+                        'policy_adherence': {'status': 'PASS', 'violations': [], 'detail': 'OK'},
+                        'structural_completeness': {'status': 'PASS', 'detail': 'OK'},
+                        'builder_decisions': {
+                            'status': 'PASS',
+                            'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                                        'DEVIATION': 0, 'DISCOVERY': 0},
+                            'detail': 'OK',
+                        },
+                        'logic_drift': {'status': 'PASS', 'pairs': [], 'detail': 'OK'},
+                    },
+                },
+                'user_testing': {'status': 'CLEAN', 'bugs': 0,
+                                 'discoveries': 0, 'intent_drifts': 0},
+            }
+            items = generate_action_items(result, cdd_status=cdd_status)
+            qa_items = items['qa']
+            self.assertTrue(len(qa_items) > 0)
+            self.assertEqual(qa_items[0]['priority'], 'MEDIUM')
+            self.assertIn('2 manual', qa_items[0]['description'])
+        finally:
+            critic.FEATURES_DIR = orig_features
+
+    def test_no_cdd_status_skips_testing_items(self):
+        result = {
+            'feature_file': 'features/test.md',
+            'spec_gate': {'status': 'PASS', 'checks': {}},
+            'implementation_gate': {
+                'status': 'PASS',
+                'checks': {
+                    'traceability': {'status': 'PASS', 'coverage': 1.0, 'detail': 'OK'},
+                    'policy_adherence': {'status': 'PASS', 'violations': [], 'detail': 'OK'},
+                    'structural_completeness': {'status': 'PASS', 'detail': 'OK'},
+                    'builder_decisions': {
+                        'status': 'PASS',
+                        'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                                    'DEVIATION': 0, 'DISCOVERY': 0},
+                        'detail': 'OK',
+                    },
+                    'logic_drift': {'status': 'PASS', 'pairs': [], 'detail': 'OK'},
+                },
+            },
+            'user_testing': {'status': 'CLEAN', 'bugs': 0,
+                             'discoveries': 0, 'intent_drifts': 0},
+        }
+        items = generate_action_items(result, cdd_status=None)
+        qa_items = items['qa']
+        # No QA items since no CDD status and no SPEC_UPDATED
+        self.assertEqual(len(qa_items), 0)
+
+
+class TestActionItemsInCriticJson(unittest.TestCase):
+    """Scenario: Action Items in Critic JSON Output"""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.features_dir = os.path.join(self.root, 'features')
+        os.makedirs(self.features_dir)
+        self.feature_path = os.path.join(self.features_dir, 'test_feature.md')
+        with open(self.feature_path, 'w') as f:
+            f.write(COMPLETE_FEATURE)
+        with open(os.path.join(self.features_dir, 'arch_critic_policy.md'), 'w') as f:
+            f.write('# Policy\n')
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def test_critic_json_has_action_items(self):
+        import critic
+        orig_features = critic.FEATURES_DIR
+        orig_tests = critic.TESTS_DIR
+        orig_root = critic.PROJECT_ROOT
+        critic.FEATURES_DIR = self.features_dir
+        critic.TESTS_DIR = os.path.join(self.root, 'tests')
+        critic.PROJECT_ROOT = self.root
+        try:
+            data = generate_critic_json(self.feature_path)
+            self.assertIn('action_items', data)
+            ai = data['action_items']
+            self.assertIn('architect', ai)
+            self.assertIn('builder', ai)
+            self.assertIn('qa', ai)
+        finally:
+            critic.FEATURES_DIR = orig_features
+            critic.TESTS_DIR = orig_tests
+            critic.PROJECT_ROOT = orig_root
+
+
+class TestActionItemsInAggregateReport(unittest.TestCase):
+    """Scenario: Action Items in Aggregate Report"""
+
+    def test_report_has_action_items_section(self):
+        results = [{
+            'feature_file': 'features/test.md',
+            'spec_gate': {
+                'status': 'FAIL',
+                'checks': {
+                    'section_completeness': {
+                        'status': 'FAIL',
+                        'detail': 'Missing sections: Requirements.',
+                    },
+                },
+            },
+            'implementation_gate': {
+                'status': 'WARN',
+                'checks': {
+                    'builder_decisions': {
+                        'status': 'PASS',
+                        'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                                    'DEVIATION': 0, 'DISCOVERY': 0},
+                    },
+                    'policy_adherence': {'status': 'PASS', 'violations': []},
+                    'traceability': {
+                        'status': 'WARN',
+                        'coverage': 0.5,
+                        'detail': '1/2 traced',
+                    },
+                },
+            },
+            'user_testing': {
+                'status': 'CLEAN',
+                'bugs': 0, 'discoveries': 0, 'intent_drifts': 0,
+            },
+            'action_items': {
+                'architect': [{
+                    'priority': 'HIGH',
+                    'category': 'spec_gate',
+                    'feature': 'test',
+                    'description': 'Fix spec gap: section_completeness -- Missing Requirements',
+                }],
+                'builder': [{
+                    'priority': 'MEDIUM',
+                    'category': 'traceability',
+                    'feature': 'test',
+                    'description': 'Write tests for test: 1/2 traced',
+                }],
+                'qa': [],
+            },
+        }]
+        report = generate_critic_report(results)
+        self.assertIn('## Action Items by Role', report)
+        self.assertIn('### Architect', report)
+        self.assertIn('### Builder', report)
+        self.assertIn('### QA', report)
+        self.assertIn('[HIGH]', report)
+        self.assertIn('[MEDIUM]', report)
+        self.assertIn('Fix spec gap', report)
+        self.assertIn('Write tests', report)
+
+    def test_report_items_sorted_by_priority(self):
+        results = [{
+            'feature_file': 'features/test.md',
+            'spec_gate': {'status': 'PASS', 'checks': {}},
+            'implementation_gate': {
+                'status': 'PASS',
+                'checks': {
+                    'builder_decisions': {
+                        'status': 'PASS',
+                        'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                                    'DEVIATION': 0, 'DISCOVERY': 0},
+                    },
+                    'policy_adherence': {'status': 'PASS', 'violations': []},
+                    'traceability': {'status': 'PASS', 'coverage': 1.0, 'detail': 'OK'},
+                },
+            },
+            'user_testing': {
+                'status': 'CLEAN',
+                'bugs': 0, 'discoveries': 0, 'intent_drifts': 0,
+            },
+            'action_items': {
+                'architect': [
+                    {'priority': 'LOW', 'category': 'spec_gate',
+                     'feature': 'test', 'description': 'Low item'},
+                    {'priority': 'HIGH', 'category': 'spec_gate',
+                     'feature': 'test', 'description': 'High item'},
+                ],
+                'builder': [],
+                'qa': [],
+            },
+        }]
+        report = generate_critic_report(results)
+        high_pos = report.index('[HIGH]')
+        low_pos = report.index('[LOW]')
+        self.assertLess(high_pos, low_pos, 'HIGH items should appear before LOW items')
 
 
 # ===================================================================

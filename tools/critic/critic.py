@@ -48,6 +48,7 @@ from traceability import (  # noqa: E402
     extract_keywords,
     discover_test_files,
     extract_test_functions,
+    extract_test_entries,
 )
 from policy_check import (  # noqa: E402
     run_policy_check,
@@ -635,6 +636,196 @@ def run_user_testing_audit(content):
 
 
 # ===================================================================
+# Action Item Generation (Section 2.10)
+# ===================================================================
+
+def _read_cdd_feature_status():
+    """Read CDD feature_status.json from disk.
+
+    Returns dict or None if file doesn't exist or is malformed.
+    """
+    status_path = os.path.join(
+        PROJECT_ROOT, TOOLS_ROOT, 'cdd', 'feature_status.json')
+    if not os.path.isfile(status_path):
+        return None
+    try:
+        with open(status_path, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError, OSError):
+        return None
+
+
+def generate_action_items(feature_result, cdd_status=None):
+    """Generate role-specific action items from critic analysis results.
+
+    Args:
+        feature_result: per-feature critic.json data dict
+        cdd_status: optional CDD feature_status.json data (for QA items)
+
+    Returns:
+        dict with 'architect', 'builder', 'qa' lists of action items.
+    """
+    feature_file = feature_result['feature_file']
+    feature_name = os.path.splitext(os.path.basename(feature_file))[0]
+    spec_gate = feature_result['spec_gate']
+    impl_gate = feature_result['implementation_gate']
+    user_testing = feature_result['user_testing']
+
+    architect_items = []
+    builder_items = []
+    qa_items = []
+
+    # --- Architect items ---
+    # Spec Gate FAIL -> HIGH
+    if spec_gate['status'] == 'FAIL':
+        for check_name, check_result in spec_gate['checks'].items():
+            if check_result['status'] == 'FAIL':
+                architect_items.append({
+                    'priority': 'HIGH',
+                    'category': 'spec_gate',
+                    'feature': feature_name,
+                    'description': (
+                        f'Fix spec gap: {check_name} -- '
+                        f'{check_result.get("detail", "FAIL")}'
+                    ),
+                })
+
+    # Spec Gate WARN -> LOW
+    if spec_gate['status'] == 'WARN':
+        for check_name, check_result in spec_gate['checks'].items():
+            if check_result['status'] == 'WARN':
+                architect_items.append({
+                    'priority': 'LOW',
+                    'category': 'spec_gate',
+                    'feature': feature_name,
+                    'description': (
+                        f'Improve spec: {check_name} -- '
+                        f'{check_result.get("detail", "WARN")}'
+                    ),
+                })
+
+    # OPEN DISCOVERY/INTENT_DRIFT in User Testing -> HIGH Architect
+    if user_testing['status'] == 'HAS_OPEN_ITEMS':
+        content = read_feature_file(
+            os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
+        ut_section = get_user_testing_section(content)
+        for line in ut_section.split('\n'):
+            stripped = line.strip()
+            if ('[DISCOVERY]' in stripped or '[INTENT_DRIFT]' in stripped) \
+                    and 'OPEN' in stripped:
+                architect_items.append({
+                    'priority': 'HIGH',
+                    'category': 'user_testing',
+                    'feature': feature_name,
+                    'description': f'Update spec for {feature_name}: {stripped}',
+                })
+
+    # --- Builder items ---
+    # Structural completeness FAIL -> HIGH
+    struct = impl_gate['checks'].get('structural_completeness', {})
+    if struct.get('status') == 'FAIL':
+        builder_items.append({
+            'priority': 'HIGH',
+            'category': 'structural_completeness',
+            'feature': feature_name,
+            'description': (
+                f'Fix failing tests for {feature_name}'
+            ),
+        })
+
+    # Traceability gaps -> MEDIUM
+    trace = impl_gate['checks'].get('traceability', {})
+    if trace.get('status') in ('WARN', 'FAIL'):
+        builder_items.append({
+            'priority': 'MEDIUM',
+            'category': 'traceability',
+            'feature': feature_name,
+            'description': (
+                f'Write tests for {feature_name}: '
+                f'{trace.get("detail", "coverage gap")}'
+            ),
+        })
+
+    # OPEN BUGs in User Testing -> HIGH Builder
+    if user_testing['status'] == 'HAS_OPEN_ITEMS':
+        content = read_feature_file(
+            os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
+        ut_section = get_user_testing_section(content)
+        for line in ut_section.split('\n'):
+            stripped = line.strip()
+            if '[BUG]' in stripped and 'OPEN' in stripped:
+                builder_items.append({
+                    'priority': 'HIGH',
+                    'category': 'user_testing',
+                    'feature': feature_name,
+                    'description': f'Fix bug in {feature_name}: {stripped}',
+                })
+
+    # Unacknowledged DEVIATION/DISCOVERY -> HIGH Builder
+    bd = impl_gate['checks'].get('builder_decisions', {})
+    bd_summary = bd.get('summary', {})
+    if bd_summary.get('DEVIATION', 0) > 0 or bd_summary.get('DISCOVERY', 0) > 0:
+        builder_items.append({
+            'priority': 'HIGH',
+            'category': 'builder_decisions',
+            'feature': feature_name,
+            'description': (
+                f'Get Architect acknowledgment for unresolved '
+                f'DEVIATION/DISCOVERY in {feature_name}'
+            ),
+        })
+
+    # --- QA items ---
+    # Features in TESTING status (from CDD) -> MEDIUM
+    if cdd_status is not None:
+        testing_features = cdd_status.get('features', {}).get('testing', [])
+        for tf in testing_features:
+            tf_file = tf.get('file', '')
+            tf_stem = os.path.splitext(os.path.basename(tf_file))[0]
+            if tf_stem == feature_name:
+                # Count manual scenarios
+                content = read_feature_file(
+                    os.path.join(FEATURES_DIR,
+                                 os.path.basename(feature_file)))
+                scenarios = parse_scenarios(content)
+                manual_count = sum(
+                    1 for s in scenarios if s.get('is_manual', False))
+                qa_items.append({
+                    'priority': 'MEDIUM',
+                    'category': 'testing_status',
+                    'feature': feature_name,
+                    'description': (
+                        f'Verify {feature_name}: '
+                        f'{manual_count} manual scenario(s)'
+                    ),
+                })
+                break
+
+    # SPEC_UPDATED discoveries -> MEDIUM QA
+    if user_testing['status'] == 'HAS_OPEN_ITEMS':
+        content = read_feature_file(
+            os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
+        ut_section = get_user_testing_section(content)
+        for line in ut_section.split('\n'):
+            stripped = line.strip()
+            if 'SPEC_UPDATED' in stripped:
+                qa_items.append({
+                    'priority': 'MEDIUM',
+                    'category': 'user_testing',
+                    'feature': feature_name,
+                    'description': (
+                        f'Re-verify {feature_name}: {stripped}'
+                    ),
+                })
+
+    return {
+        'architect': architect_items,
+        'builder': builder_items,
+        'qa': qa_items,
+    }
+
+
+# ===================================================================
 # Output generation
 # ===================================================================
 
@@ -661,8 +852,13 @@ def _policy_exempt_implementation_gate():
     }
 
 
-def generate_critic_json(feature_path):
-    """Analyze a single feature and return the critic.json data structure."""
+def generate_critic_json(feature_path, cdd_status=None):
+    """Analyze a single feature and return the critic.json data structure.
+
+    Args:
+        feature_path: absolute path to the feature file
+        cdd_status: optional CDD feature_status.json data (for QA action items)
+    """
     content = read_feature_file(feature_path)
     filename = os.path.basename(feature_path)
     feature_stem = get_feature_stem(feature_path)
@@ -678,7 +874,7 @@ def generate_critic_json(feature_path):
 
     rel_path = os.path.relpath(feature_path, PROJECT_ROOT)
 
-    return {
+    result = {
         'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'feature_file': rel_path,
         'spec_gate': spec_gate,
@@ -686,11 +882,16 @@ def generate_critic_json(feature_path):
         'user_testing': user_testing,
     }
 
+    # Generate action items
+    result['action_items'] = generate_action_items(result, cdd_status)
 
-def write_critic_json(feature_path):
+    return result
+
+
+def write_critic_json(feature_path, cdd_status=None):
     """Analyze a feature and write critic.json to tests/<feature_stem>/."""
     feature_stem = get_feature_stem(feature_path)
-    data = generate_critic_json(feature_path)
+    data = generate_critic_json(feature_path, cdd_status=cdd_status)
 
     output_dir = os.path.join(TESTS_DIR, feature_stem)
     os.makedirs(output_dir, exist_ok=True)
@@ -731,6 +932,29 @@ def generate_critic_report(results):
         lines.append(f'| {feature} | {sg} | {ig} | {ut} |')
 
     lines.append('')
+
+    # Action Items by Role
+    lines.append('## Action Items by Role')
+    lines.append('')
+    priority_order = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+    for role in ('Architect', 'Builder', 'QA'):
+        role_key = role.lower()
+        lines.append(f'### {role}')
+        lines.append('')
+        all_items = []
+        for r in results:
+            items = r.get('action_items', {}).get(role_key, [])
+            all_items.extend(items)
+        all_items.sort(key=lambda x: priority_order.get(x['priority'], 9))
+        if all_items:
+            for item in all_items:
+                lines.append(
+                    f'- **[{item["priority"]}]** ({item["feature"]}): '
+                    f'{item["description"]}'
+                )
+        else:
+            lines.append('No action items.')
+        lines.append('')
 
     # Builder Decision Audit
     lines.append('## Builder Decision Audit')
@@ -813,6 +1037,12 @@ def generate_critic_report(results):
 
 def main():
     """CLI entry point."""
+    # Try to read CDD feature status for QA action items
+    cdd_status = _read_cdd_feature_status()
+    if cdd_status is None:
+        print('Note: CDD feature_status.json not found; '
+              'skipping status-dependent QA items.')
+
     if len(sys.argv) > 1:
         # Single feature mode
         feature_path = sys.argv[1]
@@ -824,7 +1054,7 @@ def main():
                   file=sys.stderr)
             sys.exit(1)
 
-        data = write_critic_json(feature_path)
+        data = write_critic_json(feature_path, cdd_status=cdd_status)
         stem = get_feature_stem(feature_path)
         print(f'Critic analysis complete for {os.path.basename(feature_path)}')
         print(f'  Spec Gate:           {data["spec_gate"]["status"]}')
@@ -849,7 +1079,7 @@ def main():
         results = []
         for fname in feature_files:
             fpath = os.path.join(FEATURES_DIR, fname)
-            data = write_critic_json(fpath)
+            data = write_critic_json(fpath, cdd_status=cdd_status)
             results.append(data)
             stem = get_feature_stem(fpath)
             sg = data['spec_gate']['status']
