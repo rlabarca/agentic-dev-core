@@ -174,14 +174,14 @@ The Critic MUST compute a `role_status` object for each feature, summarizing whe
 *   `FAIL`: Has OPEN BUGs in User Testing Discoveries. (Lifecycle-independent.)
 *   `DISPUTED`: Has OPEN SPEC_DISPUTEs in User Testing Discoveries (no BUGs). (Lifecycle-independent.)
 *   `TODO`: Any of: (a) Feature in TESTING lifecycle state with at least one manual scenario to verify; (b) Has SPEC_UPDATED items awaiting QA re-verification; (c) user_testing.status is HAS_OPEN_ITEMS (OPEN items routing to other roles). No OPEN BUGs or SPEC_DISPUTEs.
-*   `CLEAN`: user_testing.status is CLEAN AND feature is in COMPLETE lifecycle state. A feature in TESTING state is never CLEAN -- it is awaiting QA verification.
-*   `N/A`: No higher-priority status applies. Feature has no open user testing items AND either has no manual scenarios or is not yet in TESTING/COMPLETE lifecycle state.
+*   `CLEAN`: user_testing.status is CLEAN AND `tests/<feature>/tests.json` exists with `status: "PASS"`. Lifecycle-independent -- a feature with passing tests and no open user testing items is CLEAN regardless of lifecycle state.
+*   `N/A`: No `tests/<feature>/tests.json` exists on disk AND no open user testing items of any kind. Indicates the feature has not been tested.
 
 **QA Precedence (highest wins):** FAIL > DISPUTED > TODO > CLEAN > N/A.
 
-**Lifecycle independence:** FAIL, DISPUTED, and TODO (from conditions b/c) are evaluated regardless of the feature's lifecycle state. A spec modification that resets the feature to TODO lifecycle does NOT suppress existing QA findings. N/A requires the complete absence of QA engagement (no open items of any kind).
+**Lifecycle independence:** FAIL, DISPUTED, TODO (from conditions b/c), CLEAN, and N/A are all evaluated regardless of the feature's lifecycle state. A spec modification that resets the feature to TODO lifecycle does NOT suppress existing QA findings or test results. The only lifecycle-dependent QA status is TODO condition (a), which requires TESTING state.
 
-**Lifecycle State Dependency:** QA status computation uses `.agentic_devops/cache/feature_status.json` to determine the feature's lifecycle state (TODO/TESTING/COMPLETE) for lifecycle-dependent statuses (TESTING-based TODO, COMPLETE-based CLEAN). If unavailable, lifecycle-dependent statuses are skipped. Statuses derived from user testing items (FAIL, DISPUTED, and TODO from conditions b/c) are always computed since they do not depend on lifecycle state. If feature_status.json is unavailable AND no user testing items exist, QA status defaults to `N/A` with a note in the report.
+**Lifecycle State Dependency:** QA TODO condition (a) uses `.agentic_devops/cache/feature_status.json` to determine the feature's lifecycle state (TESTING) for manual scenario verification. If unavailable, TESTING-based TODO detection is skipped. All other QA statuses (FAIL, DISPUTED, TODO from conditions b/c, CLEAN, N/A) are computed from on-disk `tests.json` and user testing items without lifecycle state.
 
 ### 2.12 Untracked File Audit
 The Critic MUST detect untracked files in the working directory and generate Architect action items for triage.
@@ -393,7 +393,7 @@ The Critic MUST detect untracked files in the working directory and generate Arc
 
 #### Scenario: Role Status QA CLEAN
     Given a feature has user_testing.status CLEAN
-    And the feature is in COMPLETE lifecycle state per feature_status.json
+    And tests/<feature>/tests.json exists with status PASS
     When the Critic tool computes role_status
     Then role_status.qa is CLEAN
 
@@ -416,7 +416,7 @@ The Critic MUST detect untracked files in the working directory and generate Arc
     Then role_status.qa is DISPUTED
 
 #### Scenario: Role Status QA N/A
-    Given a feature is in TODO lifecycle state (not yet in TESTING or COMPLETE)
+    Given no tests/<feature>/tests.json exists on disk
     And the feature has no open user testing items
     When the Critic tool computes role_status
     Then role_status.qa is N/A
@@ -442,12 +442,13 @@ The Critic MUST detect untracked files in the working directory and generate Arc
     When the Critic tool computes role_status
     Then role_status.qa is TODO
 
-#### Scenario: Role Status QA N/A for TESTING Feature with No Manual Scenarios
+#### Scenario: Role Status QA CLEAN for Feature with Passing Tests and No Manual Scenarios
     Given a feature is in TESTING lifecycle state
     And the feature has 0 manual scenarios
     And user_testing.status is CLEAN
+    And tests/<feature>/tests.json exists with status PASS
     When the Critic tool computes role_status
-    Then role_status.qa is N/A
+    Then role_status.qa is CLEAN
 
 #### Scenario: Role Status in Critic JSON Output
     Given the Critic tool completes analysis of a feature
@@ -494,8 +495,8 @@ The Critic MUST detect untracked files in the working directory and generate Arc
 *   **LLM Cache:** Stored in `tools/critic/.cache/` as JSON files keyed by hash pairs. This directory should be gitignored.
 *   **No External Dependencies:** The deterministic components (Spec Gate, traceability, policy check) MUST NOT require any external packages beyond Python 3.9+ standard library. The LLM component requires the `anthropic` Python package only when enabled.
 *   **[CLARIFICATION]** DEVIATION/DISCOVERY action items route to Architect (not Builder), as the spec says these require Architect acknowledgment. Builder's role is to get that acknowledgment, but the Critic generates the item for the Architect to act on. (Severity: INFO)
-*   **Role Status Lifecycle Dependency:** `compute_role_status()` reads `feature_status.json` via `_get_feature_lifecycle_state()` for QA status computation. If CDD is not running and `feature_status.json` doesn't exist on disk, QA status defaults to `N/A`.
-*   **[CLARIFICATION]** QA status computation evaluates lifecycle-independent statuses (FAIL, DISPUTED, TODO from conditions b/c) BEFORE checking lifecycle state. A feature in TODO lifecycle state with OPEN BUGs, SPEC_DISPUTEs, or SPEC_UPDATED items will correctly reflect QA engagement rather than defaulting to N/A. QA TODO condition (a) for TESTING state additionally checks manual scenario count — features with 0 manual scenarios get N/A since QA has nothing to verify. (Severity: INFO)
+*   **Role Status Lifecycle Dependency:** `compute_role_status()` reads `feature_status.json` via `_get_feature_lifecycle_state()` only for QA TODO condition (a) -- TESTING state with manual scenarios. All other QA statuses (FAIL, DISPUTED, TODO from b/c, CLEAN, N/A) are lifecycle-independent. If `feature_status.json` doesn't exist on disk, TESTING-based TODO detection is skipped.
+*   **QA CLEAN/N/A Signal:** QA CLEAN requires `tests/<feature>/tests.json` to exist with `status: "PASS"`. QA N/A means no tests.json exists. This makes QA status reflect actual test coverage: features with passing tests show CLEAN, features with no tests show N/A. Features with 0 manual scenarios but passing automated tests are CLEAN (not N/A).
 *   **Critic Report Readability scenario removed:** SPEC_DISPUTE resolved -- manual readability scenario removed since CRITIC_REPORT.md is agent-facing. Verified 2026-02-20.
 
 ## User Testing Discoveries
