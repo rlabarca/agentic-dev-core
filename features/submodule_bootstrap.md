@@ -219,6 +219,9 @@ Initializes a consumer project that has added `agentic-dev-core` as a git submod
     Then all path resolution uses the consumer project root (not the submodule root)
     And the sandbox is cleaned up on exit even if tests fail
 
+### Manual Scenarios (Human Verification Required)
+None. All scenarios for this feature are fully automated.
+
 ## 4. Implementation Notes
 *   **Shell Compatibility:** Use `#!/bin/bash` with POSIX-compatible patterns where possible. Avoid bashisms that would fail on older systems.
 *   **Temp File Cleanup:** Launcher scripts MUST use `trap "rm -f '$PROMPT_FILE'" EXIT` to ensure cleanup even on error.

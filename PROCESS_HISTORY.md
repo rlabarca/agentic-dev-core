@@ -2,6 +2,19 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-20] QA Server Prohibition + CDD Run Critic Button + Spec Hygiene
+
+- **Problem 1 (QA agent managing servers):** Despite the QA Override "Server Interaction Prohibition", the QA agent was still starting and stopping the CDD server during sessions. Root cause: QA_BASE.md Section 5.2 contained a Given-step example that cued the agent to ensure the server was running (`"Make sure the CDD server is running"`), which the agent interpreted as a directive to start/stop the process itself.
+- **Problem 2 (No manual Critic trigger):** The CDD dashboard had no way for the human to trigger a Critic run from the UI. The only option was running `tools/critic/run.sh` from the terminal.
+- **Problem 3 (Spec hygiene):** `submodule_bootstrap.md` and `submodule_sync.md` had no Manual Scenarios subsection (Critic WARN). `software_map_generator.md` had no `arch_*.md` prerequisite link.
+- **Solution:**
+    - Added "NO SERVER PROCESS MANAGEMENT" mandate to QA_BASE.md Section 2. Updated the Given-step example in Section 5.2 to instruct the human tester instead of implying agent action.
+    - Added CDD Monitor Section 2.7 (Manual Critic Trigger) defining a "Run Critic" button in the dashboard top-right corner next to the update timestamp. Added automated scenario for the `/run-critic` endpoint and a manual scenario for the button UI.
+    - Added explicit "Manual Scenarios: None" subsections to `submodule_bootstrap.md` and `submodule_sync.md`.
+    - Added `> Prerequisite: features/arch_critic_policy.md` to `software_map_generator.md`.
+- **Files Modified:** `instructions/QA_BASE.md`, `features/cdd_status_monitor.md`, `features/submodule_bootstrap.md`, `features/submodule_sync.md`, `features/software_map_generator.md`, `PROCESS_HISTORY.md`.
+- **Impact:** QA agent now has a base-level prohibition against server management. CDD dashboard gains a human-triggered Critic run button (Builder must implement). Spec hygiene warnings resolved.
+
 ## [2026-02-20] CDD CLI Tool Spec + Artifact Path Alignment
 
 - **Problem 1 (CDD status.sh):** All agent instruction files reference `tools/cdd/status.sh` as the CLI agent interface for feature status (added in the D4 architectural decision), but the CDD feature spec (`cdd_status_monitor.md`) never defined it as a requirement. The tool does not exist. Agents cannot follow their documented startup protocols.

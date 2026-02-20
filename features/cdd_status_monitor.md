@@ -90,7 +90,18 @@ The Continuous Design-Driven (CDD) Monitor tracks the status of all feature file
 *   **No Server Dependency:** The tool MUST NOT depend on the web server being running. It computes status directly from disk (feature files, git history, critic.json files).
 *   **Shared Logic:** The status computation logic MUST be consistent with the web server's `/status.json` endpoint. Implementation MAY share code with `serve.py` or extract a common module.
 
-### 2.7 Lifecycle Integration Test
+### 2.7 Manual Critic Trigger (Dashboard)
+*   **Button Location:** The web dashboard MUST render a "Run Critic" button in the top-right corner of the page, adjacent to the last-updated timestamp.
+*   **Visual Design:** The button should be compact, styled consistently with the dashboard theme (dark/high-contrast). It should not dominate the layout.
+*   **Behavior on Click:**
+    1.  The button becomes disabled and shows a loading/spinner state to indicate the Critic is running.
+    2.  The server executes `tools/critic/run.sh` (or equivalent logic) server-side.
+    3.  On completion, the dashboard refreshes to reflect updated role status columns.
+    4.  The button returns to its enabled state.
+*   **Error Handling:** If the Critic run fails, the button returns to its enabled state and a brief error indicator is shown near the button (e.g., red text "Critic run failed"). The dashboard retains its previous data.
+*   **No Agent Use:** This button is for human use only. Agents MUST continue to use `tools/critic/run.sh` via CLI.
+
+### 2.8 Lifecycle Integration Test
 An automated end-to-end test MUST verify that `tools/cdd/status.sh` and `tools/critic/run.sh` correctly report feature lifecycle state and role status columns through the complete feature lifecycle (TODO -> TESTING -> COMPLETE -> spec edit -> TODO reset). This test eliminates the need for manual QA verification of lifecycle and role status logic.
 
 *   **Test Script:** `tools/cdd/test_lifecycle.sh` (Bash). Executable (`chmod +x`).
@@ -169,6 +180,13 @@ These scenarios are validated by the Builder's automated test suite.
     Then valid JSON is written to stdout matching the /status.json schema
     And .agentic_devops/cache/feature_status.json is regenerated
     And the tool does not require the CDD web server to be running
+
+#### Scenario: Run Critic Endpoint
+    Given the CDD server is running
+    When a POST request is sent to /run-critic
+    Then the server executes tools/critic/run.sh (or equivalent logic) server-side
+    And returns a JSON response with a success or error status
+    And the response includes a Content-Type of application/json
 
 #### Scenario: CLI Status Tool Project Root Detection
     Given AGENTIC_PROJECT_ROOT is set to a valid project root
@@ -259,8 +277,18 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
     Then the "ACTIVE" and "COMPLETE" section headings have an underline separator
     And the headings are clearly distinguished from the feature table rows beneath them
 
+#### Scenario: Run Critic Button
+    Given the CDD server is running
+    And the User opens the web dashboard
+    When the User locates the top-right area next to the last-updated timestamp
+    Then a "Run Critic" button is visible
+    When the User clicks the "Run Critic" button
+    Then the button enters a disabled/loading state
+    And after the Critic finishes, the dashboard refreshes with updated role status columns
+    And the button returns to its enabled state
+
 ## 4. Implementation Notes
-*   **Test Scope:** Automated tests cover the `/status.json` API endpoint, the `status.sh` CLI tool, the underlying status logic, AND the full lifecycle integration test (Section 2.7). The lifecycle integration test eliminates the need for manual QA verification of lifecycle state transitions and role status column values -- these are fully verified by automation. Manual scenarios are reserved exclusively for web dashboard visual/UI verification. The Builder MUST NOT start the CDD server during automated tests.
+*   **Test Scope:** Automated tests cover the `/status.json` API endpoint, the `status.sh` CLI tool, the underlying status logic, AND the full lifecycle integration test (Section 2.8). The lifecycle integration test eliminates the need for manual QA verification of lifecycle state transitions and role status column values -- these are fully verified by automation. Manual scenarios are reserved exclusively for web dashboard visual/UI verification. The Builder MUST NOT start the CDD server during automated tests.
 *   **Visual Polish:** Use a dark, high-contrast theme suitable for 24/7 monitoring.
 *   **Test Isolation:** The test aggregator scans `tests/<feature_name>/tests.json` (resolved relative to `PROJECT_ROOT`) and treats malformed JSON as FAIL.
 *   **Name Convention:** Feature-to-test mapping uses the feature file's stem: `features/<name>.md` maps to `tests/<name>/tests.json`. The `<name>` must match exactly (case-sensitive).

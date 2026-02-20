@@ -63,6 +63,9 @@ After a consumer project updates its agentic-dev submodule (`git submodule updat
     And a note explains that base instruction changes are automatic
     And structural changes that may affect overrides are flagged
 
+### Manual Scenarios (Human Verification Required)
+None. All scenarios for this feature are fully automated.
+
 ## 4. Implementation Notes
 *   **No External Dependencies:** Use only git and standard shell utilities. Do not require `jq`, `python`, or other tools.
 *   **Diff Readability:** Consider using `--stat` for a summary view and `--no-color` for clean terminal output, followed by the full diff.
