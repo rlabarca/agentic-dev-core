@@ -2,6 +2,26 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-20] QA Status: Lifecycle-Independent Findings + Manual Scenario Filtering
+
+- **Problem 1 (QA N/A hiding findings):** When the Architect modified a feature spec, the CDD lifecycle reset the feature to TODO. The Critic's QA role_status computation treated TODO lifecycle as N/A ("not ready for QA"), even when QA had already verified the feature and recorded OPEN discoveries or SPEC_DISPUTES. Result: QA completed features (cdd_status_monitor, critic_tool, software_map_generator) showed QA=N/A on the dashboard, hiding active QA findings.
+- **Root Cause:** QA status definitions for FAIL and DISPUTED implicitly required TESTING/COMPLETE lifecycle state. The stated precedence (FAIL > DISPUTED > TODO > CLEAN > N/A) was correct but the implementation path allowed lifecycle-based N/A to override higher-priority statuses.
+- **Problem 2 (QA TODO with 0 manual scenarios):** submodule_bootstrap was in TESTING lifecycle state but had 0 manual scenarios. The Critic generated a QA action item ("Verify submodule_bootstrap: 0 manual scenarios") and set QA=TODO, even though QA had nothing to verify. The QA agent correctly ignored it, creating a dashboard/agent discrepancy.
+- **Solution (critic_tool.md Section 2.11):**
+    - FAIL and DISPUTED are now explicitly lifecycle-independent. They are evaluated before lifecycle state checks.
+    - TODO expanded with three conditions: (a) TESTING lifecycle + manual scenarios > 0; (b) SPEC_UPDATED items awaiting re-verification; (c) HAS_OPEN_ITEMS with OPEN discoveries routing to other roles. All conditions are lifecycle-independent.
+    - N/A tightened: requires complete absence of QA engagement (no open items of any kind).
+    - Added "Lifecycle independence" invariant clarifying that spec resets do NOT suppress existing QA findings.
+    - Updated Lifecycle State Dependency paragraph.
+- **Solution (critic_tool.md Section 2.10):** QA verification action items from TESTING status now require at least one manual scenario. Added QA Action Item Filtering note.
+- **New Scenarios:** Role Status QA DISPUTED in Non-TESTING Lifecycle, Role Status QA TODO for SPEC_UPDATED Items, Role Status QA TODO for HAS_OPEN_ITEMS, Role Status QA N/A for TESTING Feature with No Manual Scenarios. Updated existing QA TODO and QA N/A scenarios.
+- **Additional Changes:**
+    - Resolved SPEC_DISPUTE in critic_tool.md: Converted "Critic Report Readability" manual scenario to automated "Aggregate Report Structural Completeness" scenario (CRITIC_REPORT.md is agent-facing per Section 2.9).
+    - Fixed stale "--" to "??" in critic_tool.md "CDD Dashboard Role Columns" manual scenario.
+    - Added Label Wrapping requirement and scenario step to software_map_generator.md. Updated DISCOVERY status to SPEC_UPDATED.
+- **Files Modified:** `features/critic_tool.md` (Sections 2.10, 2.11; 5 new scenarios, 2 updated scenarios, 1 removed manual scenario, 1 new automated scenario, 1 SPEC_DISPUTE resolved), `features/software_map_generator.md` (Section 2.4, Interactive Web View scenario, DISCOVERY resolved).
+- **Impact:** Both feature specs reset to TODO. Builder must implement: lifecycle-independent QA status computation, QA action item manual scenario filtering, aggregate report structural validation, label wrapping in software map.
+
 ## [2026-02-20] Agent Shutdown Protocol: Critic Regeneration on Exit
 - **Problem:** After an agent completed work and committed to git, the Critic report and `critic.json` files were not regenerated. This left the CDD dashboard showing stale role status until the next agent session ran the Critic at startup. Between sessions, the dashboard could show incorrect TODO/DONE states.
 - **Solution:** Added a Shutdown Protocol to all three agent instruction files requiring `tools/critic/run.sh` to be run after all work is committed, before concluding the session.

@@ -138,8 +138,10 @@ The Critic MUST generate imperative action items for each role based on the anal
 | **Builder** | Structural completeness FAIL (missing/failing tests) | "Fix failing tests for submodule_bootstrap" |
 | **Builder** | Traceability gaps (unmatched scenarios) | "Write tests for: Zero-Queue Verification" |
 | **Builder** | OPEN BUGs in User Testing | "Fix bug in critic_tool: [bug title]" |
-| **QA** | Features in TESTING status (from CDD feature_status.json) | "Verify cdd_status_monitor: 3 manual scenarios" |
+| **QA** | Features in TESTING status with manual scenarios (from CDD feature_status.json) | "Verify cdd_status_monitor: 3 manual scenario(s)" |
 | **QA** | SPEC_UPDATED discoveries | "Re-verify critic_tool: [item title]" |
+
+**QA Action Item Filtering:** QA verification items (from TESTING status) are only generated when the feature has at least one manual scenario. Features with 0 manual scenarios do not generate QA verification action items.
 
 **Priority Levels:**
 *   **CRITICAL** -- `[INFEASIBLE]` tags (feature halted, Architect must revise spec).
@@ -169,15 +171,17 @@ The Critic MUST compute a `role_status` object for each feature, summarizing whe
 **Builder Lifecycle State Dependency:** Builder status computation requires `tools/cdd/feature_status.json` to determine the feature's lifecycle state. If the feature is in TODO lifecycle state, Builder is TODO regardless of traceability or test status -- the spec has changed and the implementation must be reviewed. If `feature_status.json` is unavailable, lifecycle-based TODO detection is skipped with a note in the report.
 
 **QA Status:**
+*   `FAIL`: Has OPEN BUGs in User Testing Discoveries. (Lifecycle-independent.)
+*   `DISPUTED`: Has OPEN SPEC_DISPUTEs in User Testing Discoveries (no BUGs). (Lifecycle-independent.)
+*   `TODO`: Any of: (a) Feature in TESTING lifecycle state with at least one manual scenario to verify; (b) Has SPEC_UPDATED items awaiting QA re-verification; (c) user_testing.status is HAS_OPEN_ITEMS (OPEN items routing to other roles). No OPEN BUGs or SPEC_DISPUTEs.
 *   `CLEAN`: user_testing.status is CLEAN AND feature is in COMPLETE lifecycle state. A feature in TESTING state is never CLEAN -- it is awaiting QA verification.
-*   `TODO`: Feature in TESTING lifecycle state with no OPEN BUGs or SPEC_DISPUTEs (awaiting initial verification or re-verification of SPEC_UPDATED items).
-*   `FAIL`: Has OPEN BUGs in User Testing Discoveries.
-*   `DISPUTED`: Has OPEN SPEC_DISPUTEs in User Testing Discoveries (no BUGs).
-*   `N/A`: Feature not yet in TESTING or COMPLETE lifecycle state (not ready for QA).
+*   `N/A`: No higher-priority status applies. Feature has no open user testing items AND either has no manual scenarios or is not yet in TESTING/COMPLETE lifecycle state.
 
 **QA Precedence (highest wins):** FAIL > DISPUTED > TODO > CLEAN > N/A.
 
-**Lifecycle State Dependency:** QA status computation requires `tools/cdd/feature_status.json` to determine the feature's lifecycle state (TODO/TESTING/COMPLETE). If unavailable, QA status defaults to `N/A` with a note in the report. TESTING maps to QA=TODO (awaiting verification); only COMPLETE maps to QA=CLEAN (verified, no open items).
+**Lifecycle independence:** FAIL, DISPUTED, and TODO (from conditions b/c) are evaluated regardless of the feature's lifecycle state. A spec modification that resets the feature to TODO lifecycle does NOT suppress existing QA findings. N/A requires the complete absence of QA engagement (no open items of any kind).
+
+**Lifecycle State Dependency:** QA status computation uses `tools/cdd/feature_status.json` to determine the feature's lifecycle state (TODO/TESTING/COMPLETE) for lifecycle-dependent statuses (TESTING-based TODO, COMPLETE-based CLEAN). If unavailable, lifecycle-dependent statuses are skipped. Statuses derived from user testing items (FAIL, DISPUTED, and TODO from conditions b/c) are always computed since they do not depend on lifecycle state. If feature_status.json is unavailable AND no user testing items exist, QA status defaults to `N/A` with a note in the report.
 
 ### 2.12 Untracked File Audit
 The Critic MUST detect untracked files in the working directory and generate Architect action items for triage.
@@ -326,6 +330,16 @@ The Critic MUST detect untracked files in the working directory and generate Arc
     Then it contains an "Action Items by Role" section
     And each role subsection lists items sorted by priority
 
+#### Scenario: Aggregate Report Structural Completeness
+    Given the Critic tool has run on multiple feature files
+    When CRITIC_REPORT.md is generated
+    Then it contains a "Summary" section with a table having Feature, Spec Gate, Implementation Gate, and User Testing columns
+    And it contains an "Action Items by Role" section with Architect, Builder, and QA subsections
+    And it contains a "Builder Decision Audit" section
+    And it contains a "Policy Violations" section
+    And it contains a "Traceability Gaps" section
+    And it contains an "Open User Testing Items" section
+
 #### Scenario: Architect Action Items from Spec Dispute
     Given a feature has an OPEN SPEC_DISPUTE in User Testing Discoveries
     When the Critic tool generates action items
@@ -386,6 +400,7 @@ The Critic MUST detect untracked files in the working directory and generate Arc
 #### Scenario: Role Status QA TODO for TESTING Feature
     Given a feature has user_testing.status CLEAN
     And the feature is in TESTING lifecycle state per feature_status.json
+    And the feature has at least one manual scenario
     When the Critic tool computes role_status
     Then role_status.qa is TODO
     And role_status.qa is NOT CLEAN
@@ -402,6 +417,35 @@ The Critic MUST detect untracked files in the working directory and generate Arc
 
 #### Scenario: Role Status QA N/A
     Given a feature is in TODO lifecycle state (not yet in TESTING or COMPLETE)
+    And the feature has no open user testing items
+    When the Critic tool computes role_status
+    Then role_status.qa is N/A
+
+#### Scenario: Role Status QA DISPUTED in Non-TESTING Lifecycle
+    Given a feature has OPEN SPEC_DISPUTEs but no OPEN BUGs
+    And the feature is in TODO lifecycle state per feature_status.json
+    When the Critic tool computes role_status
+    Then role_status.qa is DISPUTED
+    And DISPUTED takes precedence over N/A
+
+#### Scenario: Role Status QA TODO for SPEC_UPDATED Items
+    Given a feature has SPEC_UPDATED items in User Testing Discoveries
+    And the feature has no OPEN BUGs or SPEC_DISPUTEs
+    And the feature is in TODO lifecycle state
+    When the Critic tool computes role_status
+    Then role_status.qa is TODO
+
+#### Scenario: Role Status QA TODO for HAS_OPEN_ITEMS
+    Given a feature has user_testing.status HAS_OPEN_ITEMS with OPEN discoveries
+    And the feature has no OPEN BUGs or SPEC_DISPUTEs or SPEC_UPDATED items
+    And the feature is in TODO lifecycle state
+    When the Critic tool computes role_status
+    Then role_status.qa is TODO
+
+#### Scenario: Role Status QA N/A for TESTING Feature with No Manual Scenarios
+    Given a feature is in TESTING lifecycle state
+    And the feature has 0 manual scenarios
+    And user_testing.status is CLEAN
     When the Critic tool computes role_status
     Then role_status.qa is N/A
 
@@ -442,12 +486,7 @@ The Critic MUST detect untracked files in the working directory and generate Arc
     And critic.json files exist for features with role_status computed
     When the User opens the web dashboard
     Then each feature entry shows Architect, Builder, and QA columns with role status badges
-    And features without critic.json show "--" in all role columns
-
-#### Scenario: Critic Report Readability
-    Given CRITIC_REPORT.md has been generated
-    When the User opens it
-    Then it contains a clear summary table, builder decision audit, and traceability gaps
+    And features without critic.json show "??" in all role columns
 
 ## 4. Implementation Notes
 *   **Tool Location:** `tools/critic/` directory containing `critic.py` (main engine), `traceability.py`, `policy_check.py`, `logic_drift.py`, `test_critic.py`, and `run.sh` (executable convenience wrapper).
@@ -464,4 +503,4 @@ The Critic MUST detect untracked files in the working directory and generate Arc
 - **Observed Behavior:** The scenario asks a human to manually verify that CRITIC_REPORT.md is "readable and well-structured."
 - **Expected Behavior:** CRITIC_REPORT.md is an agent-facing artifact (Section 2.9: "The Critic is agent-facing; CDD is human-facing"). Human readability verification is not appropriate for an agent-consumed output. This scenario should be removed or converted to an automated structural check.
 - **Action Required:** Architect
-- **Status:** OPEN
+- **Status:** SPEC_UPDATED

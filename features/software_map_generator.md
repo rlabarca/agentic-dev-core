@@ -47,6 +47,7 @@ Generates a visual and machine-readable representation of the project's feature 
 *   **Node Labels:** Each feature node MUST display both its friendly name (the `Label` from the feature file metadata) and its filename. Both pieces of information must be visible without requiring hover or click interaction.
 *   **Label Typography:** The friendly name (Label) MUST be rendered in larger, bolder text than the filename. This establishes a clear visual hierarchy where the human-readable name is the primary identifier and the filename is secondary.
 *   **Label Non-Overlap:** Node labels (both friendly name and filename) MUST NOT visually overlap with labels of neighboring nodes or with each other. The layout engine must provide sufficient spacing, padding, or collision avoidance to ensure all text remains fully legible at the default zoom-to-fit level.
+*   **Label Wrapping:** Long labels MUST wrap within their containing node box rather than being clipped. The full text of both the friendly name and filename MUST remain visible at the default zoom-to-fit level.
 *   **Dark Color Scheme:** The software map MUST use a dark color scheme (dark background with light text and edges). All UI elements (graph background, category groups, nodes, modals, search input, controls) MUST be styled consistently with a dark theme.
 *   **No Legend:** The graph MUST NOT display a legend overlay. Node semantics are conveyed through category grouping and direct labeling.
 *   **Zoom-to-Fit on Load:** On initial page load, the graph MUST be automatically zoomed and centered to fit the viewable page area. On auto-refresh cycles, the current zoom level and pan position MUST be preserved.
@@ -88,6 +89,7 @@ These scenarios MUST NOT be validated through automated tests. The Builder MUST 
     And each node displays its Label and its filename
     And the Label is rendered in larger, bolder text than the filename
     And no node labels overlap with neighboring node labels
+    And long labels wrap within their node boxes without clipping
     And the overall UI uses a dark color scheme
     And no legend overlay is displayed
     And the graph is zoomed to fit the viewable page area
@@ -128,4 +130,4 @@ These scenarios MUST NOT be validated through automated tests. The Builder MUST 
 - **Observed Behavior:** Feature names that exceed the width of their containing node box are clipped on either side, making the full label unreadable.
 - **Expected Behavior:** Long labels should wrap within their node boxes so the full text remains visible.
 - **Action Required:** Architect
-- **Status:** OPEN
+- **Status:** SPEC_UPDATED
