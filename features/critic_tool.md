@@ -501,3 +501,10 @@ The Critic MUST detect untracked files in the working directory and generate Arc
 *   **[CLARIFICATION]** QA CLEAN computation restructured: pre-computes `testing_with_manual` flag then uses flat elif chain. This ensures TESTING + 0 manual scenarios falls through to CLEAN (not N/A), and TODO lifecycle with passing tests returns CLEAN (lifecycle-independent). Matches spec Sections 2.11 QA CLEAN/N/A definitions. (Severity: INFO)
 
 ## User Testing Discoveries
+
+### [BUG] QA role_status not FAIL when OPEN BUGs exist (Discovered: 2026-02-20)
+- **Scenario:** Role Status QA FAIL
+- **Observed Behavior:** When a feature has an OPEN BUG in User Testing Discoveries (e.g., software_map_generator with bugs=1, user_testing.status=HAS_OPEN_ITEMS), the Critic computes role_status.qa as "TODO" instead of "FAIL". Additionally, the Builder action_items array is missing the expected "Fix bug in <feature>: [bug title]" item — only the lifecycle_reset item is generated.
+- **Expected Behavior:** Per Section 2.11, QA FAIL is triggered by OPEN BUGs and is lifecycle-independent. QA Precedence is FAIL > DISPUTED > TODO > CLEAN > N/A, so FAIL should win. Per Section 2.10, an OPEN BUG should also generate a separate HIGH-priority Builder action item with category "open_bug".
+- **Action Required:** Builder
+- **Status:** OPEN
