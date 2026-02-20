@@ -501,12 +501,7 @@ The Critic MUST detect untracked files in the working directory and generate Arc
 *   **[CLARIFICATION]** QA CLEAN computation restructured: pre-computes `testing_with_manual` flag then uses flat elif chain. This ensures TESTING + 0 manual scenarios falls through to CLEAN (not N/A), and TODO lifecycle with passing tests returns CLEAN (lifecycle-independent). Matches spec Sections 2.11 QA CLEAN/N/A definitions. (Severity: INFO)
 *   **User Testing Discovery Parsing:** The original line-by-line parsing in `generate_action_items()` and `compute_role_status()` checked for `[TYPE]` tag and `OPEN` status on the same line. Real feature files use a heading-based format (`### [TYPE] Title` on one line, `- **Status:** OPEN` on a separate line), so the checks never matched. Fixed by adding `parse_discovery_entries()` -- a block-level parser that extracts type, title, and status from each discovery entry as a unit. All functions now pre-parse entries once and use structured lookups instead of line-by-line text matching. Test fixtures updated to use the real heading-based format.
 *   **Builder FAIL vs TODO for open BUGs:** `compute_role_status()` incorrectly set builder=FAIL when `has_open_bugs` was True. Per spec Section 2.11, Builder FAIL is specifically "tests.json exists with status FAIL". Open BUGs generate Builder action items (TODO), not test failures (FAIL). Fixed by removing `has_open_bugs` from the FAIL condition — open BUGs now correctly flow through to TODO via the action items path.
+*   **QA role_status FAIL for open BUGs:** BUG resolved 2026-02-20 — QA role_status was computed as TODO instead of FAIL when OPEN BUGs existed. Builder fixed the precedence logic and action item generation. Verified: QA column correctly shows FAIL on dashboard for features with open BUGs.
 
 ## User Testing Discoveries
 
-### [BUG] QA role_status not FAIL when OPEN BUGs exist (Discovered: 2026-02-20)
-- **Scenario:** Role Status QA FAIL
-- **Observed Behavior:** When a feature has an OPEN BUG in User Testing Discoveries (e.g., software_map_generator with bugs=1, user_testing.status=HAS_OPEN_ITEMS), the Critic computes role_status.qa as "TODO" instead of "FAIL". Additionally, the Builder action_items array is missing the expected "Fix bug in <feature>: [bug title]" item — only the lifecycle_reset item is generated.
-- **Expected Behavior:** Per Section 2.11, QA FAIL is triggered by OPEN BUGs and is lifecycle-independent. QA Precedence is FAIL > DISPUTED > TODO > CLEAN > N/A, so FAIL should win. Per Section 2.10, an OPEN BUG should also generate a separate HIGH-priority Builder action item with category "open_bug".
-- **Action Required:** Builder
-- **Status:** OPEN
