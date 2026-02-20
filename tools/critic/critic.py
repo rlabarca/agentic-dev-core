@@ -301,8 +301,12 @@ def check_section_completeness(content, sections, policy_file=False):
     }
 
 
-def check_scenario_classification(scenarios):
-    """Check that both Automated and Manual subsections have scenarios."""
+def check_scenario_classification(scenarios, content=''):
+    """Check that both Automated and Manual subsections have scenarios.
+
+    Accepts optional raw content to detect explicit "None" declarations
+    in a subsection (e.g., "### Manual Scenarios" followed by "None").
+    """
     has_automated = any(not s['is_manual'] for s in scenarios)
     has_manual = any(s['is_manual'] for s in scenarios)
 
@@ -312,6 +316,14 @@ def check_scenario_classification(scenarios):
     if has_automated and has_manual:
         return {'status': 'PASS', 'detail': 'Both Automated and Manual subsections present.'}
 
+    # Check for explicit "None" declaration in the missing subsection
+    if has_automated and not has_manual:
+        if _has_explicit_none_manual(content):
+            return {'status': 'PASS', 'detail': 'Automated present; Manual explicitly declared None.'}
+    if has_manual and not has_automated:
+        if _has_explicit_none_automated(content):
+            return {'status': 'PASS', 'detail': 'Manual present; Automated explicitly declared None.'}
+
     if has_automated or has_manual:
         which = 'Automated' if has_automated else 'Manual'
         return {'status': 'WARN', 'detail': f'Only {which} subsection present.'}
@@ -319,8 +331,30 @@ def check_scenario_classification(scenarios):
     return {'status': 'FAIL', 'detail': 'No scenarios at all.'}
 
 
+def _has_explicit_none_manual(content):
+    """Check if Manual Scenarios subsection explicitly declares 'None'."""
+    match = re.search(
+        r'###\s+Manual\s+Scenarios.*?\n(.*?)(?=\n###\s|\n##\s|\Z)',
+        content, re.DOTALL | re.IGNORECASE)
+    if match:
+        body = match.group(1).strip()
+        return body.lower() == 'none' or body.lower().startswith('none')
+    return False
+
+
+def _has_explicit_none_automated(content):
+    """Check if Automated Scenarios subsection explicitly declares 'None'."""
+    match = re.search(
+        r'###\s+Automated\s+Scenarios.*?\n(.*?)(?=\n###\s|\n##\s|\Z)',
+        content, re.DOTALL | re.IGNORECASE)
+    if match:
+        body = match.group(1).strip()
+        return body.lower() == 'none' or body.lower().startswith('none')
+    return False
+
+
 def check_policy_anchoring(content, filename):
-    """Check that the feature has a Prerequisite link to arch_*.md."""
+    """Check that the feature has a Prerequisite link to arch_*.md or other feature."""
     if is_policy_file(filename):
         return {
             'status': 'PASS',
@@ -334,12 +368,12 @@ def check_policy_anchoring(content, filename):
             'detail': f'Anchored to: {", ".join(prereqs)}.',
         }
 
-    # Check for any prerequisite line (even non-policy)
+    # Check for any prerequisite line (even non-policy) — feature is grounded
     has_any_prereq = bool(re.search(r'>\s*Prerequisite:', content))
     if has_any_prereq:
         return {
-            'status': 'WARN',
-            'detail': 'Has prerequisite but not linked to arch_*.md policy.',
+            'status': 'PASS',
+            'detail': 'Grounded via non-policy prerequisite.',
         }
 
     return {
@@ -452,7 +486,7 @@ def run_spec_gate(content, filename, features_dir):
     else:
         checks = {
             'section_completeness': check_section_completeness(content, sections),
-            'scenario_classification': check_scenario_classification(scenarios),
+            'scenario_classification': check_scenario_classification(scenarios, content),
             'policy_anchoring': check_policy_anchoring(content, filename),
             'prerequisite_integrity': check_prerequisite_integrity(
                 content, features_dir),

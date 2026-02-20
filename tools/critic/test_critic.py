@@ -926,6 +926,65 @@ class TestScenarioClassification(unittest.TestCase):
         result = check_scenario_classification([])
         self.assertEqual(result['status'], 'FAIL')
 
+    def test_explicit_none_manual_passes(self):
+        """Scenario: Scenario Classification Explicit None for Manual"""
+        content = """\
+## 3. Scenarios
+
+### Automated Scenarios
+
+#### Scenario: Auto Only
+    Given something
+    When action
+    Then result
+
+### Manual Scenarios (Human Verification Required)
+
+None
+"""
+        scenarios = parse_scenarios(content)
+        result = check_scenario_classification(scenarios, content)
+        self.assertEqual(result['status'], 'PASS')
+        self.assertIn('None', result['detail'])
+
+    def test_only_automated_no_explicit_none_still_warns(self):
+        """Automated-only without explicit None declaration stays WARN."""
+        content = """\
+## 3. Scenarios
+
+### Automated Scenarios
+
+#### Scenario: Auto Only
+    Given something
+    When action
+    Then result
+"""
+        scenarios = parse_scenarios(content)
+        result = check_scenario_classification(scenarios, content)
+        self.assertEqual(result['status'], 'WARN')
+
+
+class TestPolicyAnchoringNonPolicyPrereq(unittest.TestCase):
+    """Scenario: Spec Gate Non-Policy Prerequisite"""
+
+    def test_non_policy_prerequisite_passes(self):
+        content = '> Prerequisite: features/submodule_bootstrap.md\n'
+        result = check_policy_anchoring(content, 'submodule_sync.md')
+        self.assertEqual(result['status'], 'PASS')
+        self.assertIn('Grounded', result['detail'])
+
+    def test_no_prerequisite_warns(self):
+        """Scenario: Spec Gate No Prerequisite on Non-Policy"""
+        content = '# Feature: Standalone\n'
+        result = check_policy_anchoring(content, 'standalone_feature.md')
+        self.assertEqual(result['status'], 'WARN')
+
+    def test_arch_prerequisite_passes(self):
+        content = '> Prerequisite: features/arch_critic_policy.md\n'
+        result = check_policy_anchoring(content, 'critic_tool.md')
+        self.assertEqual(result['status'], 'PASS')
+        self.assertIn('Anchored', result['detail'])
+
 
 # ===================================================================
 # Integration: Full Spec Gate
