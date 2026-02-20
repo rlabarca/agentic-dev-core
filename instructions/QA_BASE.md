@@ -116,15 +116,17 @@ If yes, record it as a `[DISCOVERY]` entry.
 After all scenarios for a feature are verified:
 1.  Present a summary: scenarios passed / total, discoveries recorded (if any).
 2.  Ensure all changes for this feature are committed to git.
-3.  Run `tools/critic/run.sh` to regenerate the Critic report and `critic.json` files. This updates the CDD dashboard immediately so the feature's QA status reflects the verification results.
-4.  Move to the next TESTING feature, or conclude if all features are done.
+3.  **If all manual scenarios passed with zero discoveries:** Mark the feature as complete with a status commit: `git commit --allow-empty -m "status(scope): [Complete features/FILENAME.md]"`. This transitions the feature from TESTING to COMPLETE.
+4.  **If discoveries were recorded:** Do NOT mark as complete. The feature remains in TESTING until all discoveries are resolved and re-verified.
+5.  Run `tools/critic/run.sh` to regenerate the Critic report and `critic.json` files. This updates the CDD dashboard immediately so the feature's QA status reflects the verification results.
+6.  Move to the next TESTING feature, or conclude if all features are done.
 
 ## 6. Session Conclusion
 
 When all TESTING features have been verified:
-1.  Present a final summary: features verified, scenarios passed/failed, discoveries recorded.
-2.  If there are zero discoveries, inform the user that all features are clean and the Architect can proceed with the release.
-3.  If there are discoveries, summarize the routing: which items need Architect attention vs. Builder fixes.
+1.  Present a final summary: features verified, scenarios passed/failed, discoveries recorded, features marked as complete.
+2.  If there are zero discoveries, confirm that all clean features have been marked `[Complete]` and the Architect can proceed with the release.
+3.  If there are discoveries, summarize the routing: which items need Architect attention vs. Builder fixes. Only features with zero discoveries should have been marked `[Complete]`.
 4.  Ensure all changes are committed to git.
 5.  Run `tools/critic/run.sh` to regenerate the Critic report and all `critic.json` files. This ensures the CDD dashboard reflects the current project state for the next agent session.
 

@@ -97,8 +97,8 @@ When making non-trivial implementation decisions, you MUST classify and document
 This commit transitions the feature out of **TODO**. It MUST be a **separate commit** from the implementation work in Step 2 to ensure the status tag is the latest commit referencing this feature file.
 
 *   **A. Determine Status Tag:**
-    *   If the feature requires manual/human verification: `[Ready for Verification features/FILENAME.md]` (transitions to **TESTING**)
-    *   If all verification is automated and passing: `[Complete features/FILENAME.md]` (transitions to **COMPLETE**)
+    *   If the feature has manual scenarios requiring human verification: `[Ready for Verification features/FILENAME.md]` (transitions to **TESTING**). The QA Agent will mark `[Complete]` after clean verification.
+    *   If all verification is automated (no manual scenarios) and passing: `[Complete features/FILENAME.md]` (transitions to **COMPLETE**)
 *   **B. Execute Status Commit:** `git commit --allow-empty -m "status(scope): TAG"`
 *   **C. Verify Transition:** Run `curl -s http://localhost:<cdd_port>/status.json` (port from `.agentic_devops/config.json`) and confirm the feature now appears in the expected state (`testing` or `complete`). Do NOT use the web dashboard. If the status did not update as expected, investigate and correct before moving on.
 

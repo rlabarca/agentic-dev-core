@@ -2,6 +2,17 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-20] QA Agent: Completion Authority for Manually Verified Features
+- **Problem:** After QA verified all manual scenarios as passing with zero discoveries, features remained in TESTING state with QA=TODO. The Builder was responsible for making `[Complete]` status commits, but QA had already done the verification. This created an unnecessary handoff: QA reports clean -> user asks Builder to mark complete -> Builder makes empty commit. Meanwhile, the CDD dashboard showed stale TODO status.
+- **Solution:** Split completion authority based on manual scenario presence:
+    - **Features with manual scenarios:** QA makes the `[Complete]` status commit immediately after clean verification (all scenarios pass, zero discoveries). No Builder handoff needed.
+    - **Features without manual scenarios:** Builder marks `[Complete]` directly (unchanged behavior).
+- **Files Modified:**
+    - `instructions/HOW_WE_WORK_BASE.md`: Updated QA role (Section 2) to allow status commits for manually-verified features. Updated lifecycle step 4 to reflect split responsibility.
+    - `instructions/BUILDER_BASE.md`: Updated status tag determination (Section 4, Step 4.A) to clarify Builder only marks `[Complete]` for features with no manual scenarios.
+    - `instructions/QA_BASE.md`: Updated Feature Summary (Section 5.4) to add `[Complete]` commit after clean verification. Updated Session Conclusion (Section 6) to reflect completion tracking.
+- **Impact:** Process change only. No spec or code changes. QA agent now owns the TESTING -> COMPLETE transition for features with manual scenarios.
+
 ## [2026-02-20] QA Status: Lifecycle-Independent Findings + Manual Scenario Filtering
 
 - **Problem 1 (QA N/A hiding findings):** When the Architect modified a feature spec, the CDD lifecycle reset the feature to TODO. The Critic's QA role_status computation treated TODO lifecycle as N/A ("not ready for QA"), even when QA had already verified the feature and recorded OPEN discoveries or SPEC_DISPUTES. Result: QA completed features (cdd_status_monitor, critic_tool, software_map_generator) showed QA=N/A on the dashboard, hiding active QA findings.

@@ -23,7 +23,8 @@ The single source of truth for any project using this framework is not the code,
 *   **Focus:** "The Verification and The Feedback".
 *   **Ownership:** `## User Testing Discoveries` section in feature files (exclusive write access), manual verification execution, discovery lifecycle management.
 *   **Key Duty:** Executing manual Gherkin scenarios, recording structured discoveries (BUG, DISCOVERY, INTENT_DRIFT, SPEC_DISPUTE), and tracking their resolution through the lifecycle.
-*   **Does NOT:** Write or modify application/tool code (Builder), modify Gherkin scenarios or requirements (Architect), or make status tag commits (Builder).
+*   **Does NOT:** Write or modify application/tool code (Builder), or modify Gherkin scenarios or requirements (Architect).
+*   **Status Commits:** QA makes `[Complete]` status commits for features that have manual scenarios, after all manual scenarios pass with zero discoveries. Features with no manual scenarios are completed by the Builder.
 
 ### The Human Executive
 *   **Focus:** "The Intent and The Review".
@@ -33,7 +34,7 @@ The single source of truth for any project using this framework is not the code,
 1.  **Design:** Architect creates/refines a feature file in `features/`.
 2.  **Implementation:** Builder reads the feature and implementation notes, writes code/tests, and verifies locally.
 3.  **Verification:** QA Agent executes manual scenarios and records discoveries. Human Executive performs final verification as needed.
-4.  **Completion:** Builder marks the status as `[Complete]`.
+4.  **Completion:** If the feature has no manual scenarios, the Builder marks `[Complete]`. If it has manual scenarios, the QA Agent marks `[Complete]` after clean verification.
 5.  **Synchronization:** Architect updates documentation and generates the Software Map.
 
 ## 4. Knowledge Colocation
