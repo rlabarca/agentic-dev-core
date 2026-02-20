@@ -53,7 +53,10 @@ def get_dir_snapshot(directory):
 
 
 def run_generator():
-    """Run generate_tree.py to regenerate all outputs."""
+    """Run generate_tree.py to regenerate all outputs.
+
+    Returns True on success, False on failure.
+    """
     python_exe = sys.executable
     try:
         result = subprocess.run(
@@ -62,10 +65,13 @@ def run_generator():
         )
         if result.returncode == 0:
             print(f"[watcher] Regenerated outputs at {time.strftime('%H:%M:%S')}")
+            return True
         else:
             print(f"[watcher] Generation failed: {result.stderr}")
+            return False
     except Exception as e:
         print(f"[watcher] Error running generator: {e}")
+        return False
 
 
 def file_watcher():
@@ -77,8 +83,9 @@ def file_watcher():
         new_snapshot = get_dir_snapshot(FEATURES_DIR)
         if new_snapshot != snapshot:
             print(f"[watcher] Change detected, regenerating...")
-            snapshot = new_snapshot
-            run_generator()
+            if run_generator():
+                snapshot = new_snapshot
+            # On failure, keep old snapshot so watcher retries next cycle
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):

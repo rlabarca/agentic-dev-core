@@ -287,5 +287,10 @@ def update_readme(mmd_content):
 
 if __name__ == "__main__":
     features = parse_features(FEATURES_DIR)
-    update_outputs(FEATURES_DIR, MMD_FILE)
+    # Generate dependency_graph.json first (critical: web UI depends on this)
     generate_dependency_graph(features)
+    # Update Mermaid/README (non-critical for web UI; failures must not block JSON)
+    try:
+        update_outputs(FEATURES_DIR, MMD_FILE)
+    except Exception as e:
+        print(f"Warning: Mermaid/README update failed: {e}", file=sys.stderr)
