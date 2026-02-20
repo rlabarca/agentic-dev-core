@@ -65,12 +65,6 @@ These scenarios are validated by the Builder's automated test suite.
     Then dependency_graph.json is regenerated with the new feature
     And the Mermaid export files are regenerated
 
-#### Scenario: Reactive Update on Feature Change
-    Given the software map server is running
-    When a feature file is created, modified, or deleted
-    Then the tool automatically regenerates the Mermaid exports
-    And the tool automatically regenerates dependency_graph.json
-
 #### Scenario: Agent Reads Dependency Graph
     Given dependency_graph.json exists at tools/software_map/dependency_graph.json
     When an agent needs to query the dependency graph
@@ -79,6 +73,12 @@ These scenarios are validated by the Builder's automated test suite.
 
 ### Manual Scenarios (Human Verification Required)
 These scenarios MUST NOT be validated through automated tests. The Builder MUST NOT start the server. The Builder must instruct the User to start the server (`tools/software_map/start.sh`) and verify the web UI visually.
+
+#### Scenario: Reactive Update on Feature Change
+    Given the software map server is running
+    When a feature file is created, modified, or deleted
+    Then the tool automatically regenerates the Mermaid exports
+    And the tool automatically regenerates dependency_graph.json
 
 #### Scenario: Interactive Web View
     Given the software map server is running
@@ -119,3 +119,4 @@ These scenarios MUST NOT be validated through automated tests. The Builder MUST 
 *   **Cycle Detection:** Uses DFS with 3-color marking (WHITE/GRAY/BLACK). External prerequisites (not in the features directory) are skipped without triggering false positives.
 *   **File Watch Mode:** `serve.py` polls `features/` directory every 2 seconds using `os.scandir` mtime snapshots. No external dependencies required (no `watchdog`).
 *   **Deterministic JSON:** `dependency_graph.json` uses `sort_keys=True` on `json.dump` and all arrays are pre-sorted by filename/path before serialization.
+*   **Reactive Update Testing:** The "Reactive Update on Feature Change" scenario requires the running server (`serve.py`) and is classified as Manual. File-watch regeneration is verified during Human Verification.
