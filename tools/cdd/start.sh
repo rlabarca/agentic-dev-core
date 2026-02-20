@@ -37,6 +37,16 @@ fi
 RUNTIME_DIR="$PROJECT_ROOT/.agentic_devops/runtime"
 mkdir -p "$RUNTIME_DIR"
 
-nohup $PYTHON_EXE $DIR/serve.py > "$RUNTIME_DIR/cdd.log" 2>&1 &
+nohup $PYTHON_EXE "$DIR/serve.py" > "$RUNTIME_DIR/cdd.log" 2>&1 &
 echo $! > "$RUNTIME_DIR/cdd.pid"
-echo "CDD Monitor started on port $PORT (PID: $(cat "$RUNTIME_DIR/cdd.pid"))"
+SERVER_PID=$(cat "$RUNTIME_DIR/cdd.pid")
+
+# Verify server actually started (detect bind failures)
+sleep 0.5
+if kill -0 "$SERVER_PID" 2>/dev/null; then
+    echo "CDD Monitor started on port $PORT (PID: $SERVER_PID)"
+else
+    echo "ERROR: CDD Monitor failed to start (PID $SERVER_PID exited). Check $RUNTIME_DIR/cdd.log" >&2
+    rm -f "$RUNTIME_DIR/cdd.pid"
+    exit 1
+fi

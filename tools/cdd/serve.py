@@ -608,6 +608,7 @@ if __name__ == "__main__":
         json.dump(api_data, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write('\n')
     else:
+        socketserver.TCPServer.allow_reuse_address = True
         with socketserver.TCPServer(("", PORT), Handler) as httpd:
             print(f"CDD Monitor serving at http://localhost:{PORT}")
             httpd.serve_forever()
