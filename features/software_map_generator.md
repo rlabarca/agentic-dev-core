@@ -137,19 +137,8 @@ These scenarios MUST NOT be validated through automated tests. The Builder MUST 
 *   **Reactive Refresh Resilience:** Fixed two issues that could cause stale category data on reactive refresh: (1) In `generate_tree.py`, `generate_dependency_graph()` now runs BEFORE `update_outputs()` (Mermaid/README), so the critical JSON output is written even if README update fails. (2) In `serve.py`, the file watcher snapshot is only updated on successful generation — failed generations trigger retry on the next poll cycle. Builder audit (2026-02-20): full code trace confirms the reactive path is correct — watcher detects mtime changes, subprocess re-parses features (including Category), writes updated JSON, web UI fetches with cache-busting and rebuilds Cytoscape graph with new category groupings. Needs QA re-verification with server running.
 *   **Start/Stop PID Path Consistency:** `start.sh` writes PID files to `.agentic_devops/runtime/`. `stop.sh` MUST read from the same runtime directory using the same project root detection logic. A path mismatch between start and stop causes orphaned server processes and port conflicts on subsequent starts.
 *   **Label wrapping in node boxes:** DISCOVERY resolved -- long labels now wrap via `wrapText()` SVG logic instead of clipping. Verified 2026-02-20.
+*   **Start/Stop double invocation:** DISCOVERY resolved 2026-02-20 — PID path mismatch between start.sh and stop.sh caused orphaned processes. Builder fixed path consistency. Verified: server starts on first invocation after stop.
+*   **Category grouping on reactive refresh:** BUG resolved 2026-02-20 — category changes weren't reflected on reactive refresh. Builder fixed generation ordering and watcher resilience. Verified: editing Category metadata updates grouping in web UI within seconds.
 
 ## User Testing Discoveries
 
-### [DISCOVERY] start.sh requires double invocation to start server (Discovered: 2026-02-20)
-- **Scenario:** Server Start/Stop Lifecycle
-- **Observed Behavior:** After stopping the Software Map server, running `tools/software_map/start.sh` does not reliably start the server on the first invocation. A second run of the script is required to actually start the server. Root cause: `stop.sh` reads PID from the old `$DIR/` path while `start.sh` writes PID to `.agentic_devops/runtime/`, causing stop to be a no-op and the port to remain occupied.
-- **Expected Behavior:** Server starts on first invocation after a stop. PID paths must be consistent between start.sh and stop.sh.
-- **Action Required:** Builder
-- **Status:** SPEC_UPDATED
-
-### [BUG] Category grouping not updated on reactive refresh (Discovered: 2026-02-20)
-- **Scenario:** Reactive Update on Feature Change
-- **Observed Behavior:** When a feature file's `> Category:` metadata was edited and committed to git while the software map server was running, the web UI continued to display the old category grouping. The node was not moved to the new category group.
-- **Expected Behavior:** The tool automatically regenerates the Mermaid exports and dependency_graph.json when a feature file is modified, and the web UI reflects the updated category grouping.
-- **Action Required:** Builder
-- **Status:** OPEN
