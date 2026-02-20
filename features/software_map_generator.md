@@ -126,3 +126,10 @@ These scenarios MUST NOT be validated through automated tests. The Builder MUST 
 *   **Label wrapping in node boxes:** DISCOVERY resolved -- long labels now wrap via `wrapText()` SVG logic instead of clipping. Verified 2026-02-20.
 
 ## User Testing Discoveries
+
+### [BUG] Category grouping not updated on reactive refresh (Discovered: 2026-02-20)
+- **Scenario:** Reactive Update on Feature Change
+- **Observed Behavior:** When a feature file's `> Category:` metadata was edited and committed to git while the software map server was running, the web UI continued to display the old category grouping. The node was not moved to the new category group.
+- **Expected Behavior:** The tool automatically regenerates the Mermaid exports and dependency_graph.json when a feature file is modified, and the web UI reflects the updated category grouping.
+- **Action Required:** Builder
+- **Status:** OPEN
