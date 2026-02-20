@@ -2036,7 +2036,9 @@ Reqs.
 * Note.
 
 ## User Testing Discoveries
-- [SPEC_DISPUTE] (OPEN) User disagrees with Auto Test expected behavior
+
+### [SPEC_DISPUTE] User disagrees with Auto Test expected behavior (Discovered: 2026-01-01)
+- **Status:** OPEN
 """
         with open(os.path.join(self.features_dir, 'disputed.md'), 'w') as f:
             f.write(feature_content)
@@ -2252,7 +2254,9 @@ Reqs.
 * Note.
 
 ## User Testing Discoveries
-- [SPEC_DISPUTE] (OPEN) User disagrees with behavior
+
+### [SPEC_DISPUTE] User disagrees with behavior (Discovered: 2026-01-01)
+- **Status:** OPEN
 """
         with open(os.path.join(self.features_dir, 'blocked.md'), 'w') as f:
             f.write(content)
@@ -2307,7 +2311,9 @@ class TestRoleStatusQAFAIL(unittest.TestCase):
 Overview.
 
 ## User Testing Discoveries
-- [BUG] (OPEN) Something is broken
+
+### [BUG] Something is broken (Discovered: 2026-01-01)
+- **Status:** OPEN
 """
         with open(os.path.join(self.features_dir, 'buggy.md'), 'w') as f:
             f.write(content)
@@ -2353,7 +2359,9 @@ class TestRoleStatusQADISPUTED(unittest.TestCase):
 Overview.
 
 ## User Testing Discoveries
-- [SPEC_DISPUTE] (OPEN) Scenario expected wrong behavior
+
+### [SPEC_DISPUTE] Scenario expected wrong behavior (Discovered: 2026-01-01)
+- **Status:** OPEN
 """
         with open(os.path.join(self.features_dir, 'disputed_qa.md'), 'w') as f:
             f.write(content)
@@ -2662,7 +2670,9 @@ class TestRoleStatusQADISPUTEDInNonTestingLifecycle(unittest.TestCase):
 Overview.
 
 ## User Testing Discoveries
-- [SPEC_DISPUTE] (OPEN) User disagrees with behavior
+
+### [SPEC_DISPUTE] User disagrees with behavior (Discovered: 2026-01-01)
+- **Status:** OPEN
 """
         with open(os.path.join(self.features_dir, 'disputed_todo.md'), 'w') as f:
             f.write(content)

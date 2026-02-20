@@ -173,6 +173,50 @@ def get_user_testing_section(content):
     return ''
 
 
+def parse_discovery_entries(section_text):
+    """Parse structured discovery entries from User Testing Discoveries text.
+
+    Each entry starts with a ### heading containing [TYPE] and has a Status line.
+    Returns list of dicts: {'type': str, 'title': str, 'status': str, 'heading': str}
+    """
+    entries = []
+    current_type = None
+    current_title = None
+    current_status = None
+
+    for line in section_text.split('\n'):
+        heading_match = re.match(
+            r'^###\s+\[(BUG|DISCOVERY|INTENT_DRIFT|SPEC_DISPUTE)\]\s+(.+)',
+            line)
+        if heading_match:
+            if current_type is not None:
+                entries.append({
+                    'type': current_type,
+                    'title': current_title,
+                    'status': current_status or 'OPEN',
+                    'heading': f'[{current_type}] {current_title}',
+                })
+            current_type = heading_match.group(1)
+            current_title = heading_match.group(2).strip()
+            current_status = None
+            continue
+
+        status_match = re.match(
+            r'^-\s+\*\*Status:\*\*\s+(\S+)', line.strip())
+        if status_match and current_type is not None:
+            current_status = status_match.group(1)
+
+    if current_type is not None:
+        entries.append({
+            'type': current_type,
+            'title': current_title,
+            'status': current_status or 'OPEN',
+            'heading': f'[{current_type}] {current_title}',
+        })
+
+    return entries
+
+
 def is_policy_file(filename):
     """Check if a filename is an architectural policy file."""
     return os.path.basename(filename).startswith('arch_')
@@ -749,31 +793,34 @@ def generate_action_items(feature_result, cdd_status=None):
             ),
         })
 
-    # OPEN DISCOVERY/INTENT_DRIFT/SPEC_DISPUTE in User Testing -> HIGH Architect
+    # Pre-parse User Testing discovery entries (block-level parsing)
+    ut_entries = []
     if user_testing['status'] == 'HAS_OPEN_ITEMS':
-        content = read_feature_file(
+        _ut_content = read_feature_file(
             os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
-        ut_section = get_user_testing_section(content)
-        for line in ut_section.split('\n'):
-            stripped = line.strip()
-            if ('[DISCOVERY]' in stripped or '[INTENT_DRIFT]' in stripped) \
-                    and 'OPEN' in stripped:
-                architect_items.append({
-                    'priority': 'HIGH',
-                    'category': 'user_testing',
-                    'feature': feature_name,
-                    'description': f'Update spec for {feature_name}: {stripped}',
-                })
-            if '[SPEC_DISPUTE]' in stripped and 'OPEN' in stripped:
-                architect_items.append({
-                    'priority': 'HIGH',
-                    'category': 'user_testing',
-                    'feature': feature_name,
-                    'description': (
-                        f'Review disputed scenario in {feature_name}: '
-                        f'{stripped}'
-                    ),
-                })
+        _ut_section = get_user_testing_section(_ut_content)
+        ut_entries = parse_discovery_entries(_ut_section)
+
+    # OPEN DISCOVERY/INTENT_DRIFT/SPEC_DISPUTE in User Testing -> HIGH Architect
+    for entry in ut_entries:
+        if entry['type'] in ('DISCOVERY', 'INTENT_DRIFT') \
+                and entry['status'] == 'OPEN':
+            architect_items.append({
+                'priority': 'HIGH',
+                'category': 'user_testing',
+                'feature': feature_name,
+                'description': f'Update spec for {feature_name}: {entry["heading"]}',
+            })
+        if entry['type'] == 'SPEC_DISPUTE' and entry['status'] == 'OPEN':
+            architect_items.append({
+                'priority': 'HIGH',
+                'category': 'user_testing',
+                'feature': feature_name,
+                'description': (
+                    f'Review disputed scenario in {feature_name}: '
+                    f'{entry["heading"]}'
+                ),
+            })
 
     # --- Builder items ---
     # Feature in TODO lifecycle state -> HIGH (spec modified, needs review)
@@ -815,19 +862,14 @@ def generate_action_items(feature_result, cdd_status=None):
         })
 
     # OPEN BUGs in User Testing -> HIGH Builder
-    if user_testing['status'] == 'HAS_OPEN_ITEMS':
-        content = read_feature_file(
-            os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
-        ut_section = get_user_testing_section(content)
-        for line in ut_section.split('\n'):
-            stripped = line.strip()
-            if '[BUG]' in stripped and 'OPEN' in stripped:
-                builder_items.append({
-                    'priority': 'HIGH',
-                    'category': 'user_testing',
-                    'feature': feature_name,
-                    'description': f'Fix bug in {feature_name}: {stripped}',
-                })
+    for entry in ut_entries:
+        if entry['type'] == 'BUG' and entry['status'] == 'OPEN':
+            builder_items.append({
+                'priority': 'HIGH',
+                'category': 'user_testing',
+                'feature': feature_name,
+                'description': f'Fix bug in {feature_name}: {entry["heading"]}',
+            })
 
     # --- QA items ---
     # Features in TESTING status (from CDD) -> MEDIUM
@@ -857,21 +899,16 @@ def generate_action_items(feature_result, cdd_status=None):
                 break
 
     # SPEC_UPDATED discoveries -> MEDIUM QA
-    if user_testing['status'] == 'HAS_OPEN_ITEMS':
-        content = read_feature_file(
-            os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
-        ut_section = get_user_testing_section(content)
-        for line in ut_section.split('\n'):
-            stripped = line.strip()
-            if 'SPEC_UPDATED' in stripped:
-                qa_items.append({
-                    'priority': 'MEDIUM',
-                    'category': 'user_testing',
-                    'feature': feature_name,
-                    'description': (
-                        f'Re-verify {feature_name}: {stripped}'
-                    ),
-                })
+    for entry in ut_entries:
+        if entry['status'] == 'SPEC_UPDATED':
+            qa_items.append({
+                'priority': 'MEDIUM',
+                'category': 'user_testing',
+                'feature': feature_name,
+                'description': (
+                    f'Re-verify {feature_name}: {entry["heading"]}'
+                ),
+            })
 
     return {
         'architect': architect_items,
@@ -988,33 +1025,28 @@ def compute_role_status(feature_result, cdd_status=None):
     bd_summary = bd.get('summary', {})
     has_infeasible = bd_summary.get('INFEASIBLE', 0) > 0
 
-    # Check for SPEC_DISPUTE (Builder becomes BLOCKED)
-    has_spec_dispute = user_testing.get('spec_disputes', 0) > 0
-    # Only count OPEN spec disputes
-    open_spec_disputes = False
-    if has_spec_dispute:
-        content = read_feature_file(
+    # Pre-parse User Testing discovery entries once (block-level parsing)
+    try:
+        _content = read_feature_file(
             os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
-        ut_section = get_user_testing_section(content)
-        for line in ut_section.split('\n'):
-            if '[SPEC_DISPUTE]' in line and 'OPEN' in line:
-                open_spec_disputes = True
-                break
+    except (IOError, OSError):
+        _content = ''
+    _ut_section = get_user_testing_section(_content)
+    _ut_entries = parse_discovery_entries(_ut_section)
+
+    # Check for OPEN SPEC_DISPUTEs (Builder becomes BLOCKED)
+    open_spec_disputes = any(
+        e['type'] == 'SPEC_DISPUTE' and e['status'] == 'OPEN'
+        for e in _ut_entries)
 
     # Check structural completeness
     struct = impl_gate['checks'].get('structural_completeness', {})
     struct_status = struct.get('status', 'FAIL')
 
     # Check for open BUGs
-    has_open_bugs = False
-    if user_testing.get('bugs', 0) > 0:
-        content = read_feature_file(
-            os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
-        ut_section = get_user_testing_section(content)
-        for line in ut_section.split('\n'):
-            if '[BUG]' in line and 'OPEN' in line:
-                has_open_bugs = True
-                break
+    has_open_bugs = any(
+        e['type'] == 'BUG' and e['status'] == 'OPEN'
+        for e in _ut_entries)
 
     # Check traceability
     trace = impl_gate['checks'].get('traceability', {})
@@ -1049,47 +1081,23 @@ def compute_role_status(feature_result, cdd_status=None):
         builder_status = 'TODO'
 
     # --- QA status ---
-    # Lifecycle-independent checks first: FAIL, DISPUTED, TODO (b/c)
-    has_open_bugs_qa = False
-    has_open_disputes_qa = False
-    has_spec_updated_qa = False
-
-    if user_testing.get('bugs', 0) > 0:
-        content = read_feature_file(
-            os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
-        ut_section = get_user_testing_section(content)
-        for line in ut_section.split('\n'):
-            if '[BUG]' in line and 'OPEN' in line:
-                has_open_bugs_qa = True
-                break
-
-    if user_testing.get('spec_disputes', 0) > 0:
-        content = read_feature_file(
-            os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
-        ut_section = get_user_testing_section(content)
-        for line in ut_section.split('\n'):
-            if '[SPEC_DISPUTE]' in line and 'OPEN' in line:
-                has_open_disputes_qa = True
-                break
-
-    if user_testing['status'] == 'HAS_OPEN_ITEMS':
-        content = read_feature_file(
-            os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
-        ut_section = get_user_testing_section(content)
-        has_spec_updated_qa = 'SPEC_UPDATED' in ut_section
+    # Lifecycle-independent checks using pre-parsed entries
+    has_open_bugs_qa = any(
+        e['type'] == 'BUG' and e['status'] == 'OPEN'
+        for e in _ut_entries)
+    has_open_disputes_qa = any(
+        e['type'] == 'SPEC_DISPUTE' and e['status'] == 'OPEN'
+        for e in _ut_entries)
+    has_spec_updated_qa = any(
+        e['status'] == 'SPEC_UPDATED' for e in _ut_entries)
 
     # Pre-compute: is this a TESTING feature with manual scenarios?
     testing_with_manual = False
     if lifecycle_state == 'testing':
-        try:
-            content = read_feature_file(
-                os.path.join(FEATURES_DIR, os.path.basename(feature_file)))
-            scenarios = parse_scenarios(content)
-            manual_count = sum(
-                1 for s in scenarios if s.get('is_manual', False))
-            testing_with_manual = manual_count > 0
-        except (IOError, OSError):
-            testing_with_manual = True  # safe default: assume manual exist
+        scenarios = parse_scenarios(_content)
+        manual_count = sum(
+            1 for s in scenarios if s.get('is_manual', False))
+        testing_with_manual = manual_count > 0
 
     # Apply precedence: FAIL > DISPUTED > TODO > CLEAN > N/A
     if has_open_bugs_qa:
