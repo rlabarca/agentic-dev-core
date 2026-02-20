@@ -1,15 +1,6 @@
 #!/bin/bash
 # start.sh
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-PYTHON_EXE="python3"
-
-# Check if we are in a virtualenv
-if [ -d "$DIR/../../.venv" ]; then
-    PYTHON_EXE="$DIR/../../.venv/bin/python3"
-elif [ -d "$DIR/../../../.venv" ]; then
-     PYTHON_EXE="$DIR/../../../.venv/bin/python3"
-fi
-
 # Project root and config discovery (Section 2.11)
 if [ -n "${AGENTIC_PROJECT_ROOT:-}" ] && [ -d "$AGENTIC_PROJECT_ROOT/.agentic_devops" ]; then
     PROJECT_ROOT="$AGENTIC_PROJECT_ROOT"
@@ -23,6 +14,10 @@ else
         PROJECT_ROOT="$(cd "$DIR/../.." 2>/dev/null && pwd)"
     fi
 fi
+
+# Source shared Python resolver (python_environment.md §2.2)
+source "$DIR/../resolve_python.sh"
+
 PORT=8086
 
 if [ -f "$CONFIG_FILE" ]; then

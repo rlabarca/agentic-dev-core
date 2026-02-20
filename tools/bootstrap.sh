@@ -11,6 +11,10 @@ SUBMODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SUBMODULE_NAME="$(basename "$SUBMODULE_DIR")"
 PROJECT_ROOT="$(cd "$SUBMODULE_DIR/.." && pwd)"
 
+# Source shared Python resolver (python_environment.md §2.2)
+export AGENTIC_PROJECT_ROOT="$PROJECT_ROOT"
+source "$SCRIPT_DIR/resolve_python.sh"
+
 ###############################################################################
 # 2. Guard: Prevent Re-Initialization
 ###############################################################################
@@ -39,7 +43,7 @@ sed -i.bak "s|\"tools_root\": \"[^\"]*\"|\"tools_root\": \"$TOOLS_ROOT_VALUE\"|"
 rm -f "$PROJECT_ROOT/.agentic_devops/config.json.bak"
 
 # Validate JSON after patching (Section 2.10)
-if ! python3 -c "import json; json.load(open('$PROJECT_ROOT/.agentic_devops/config.json'))"; then
+if ! "$PYTHON_EXE" -c "import json; json.load(open('$PROJECT_ROOT/.agentic_devops/config.json'))"; then
     echo "ERROR: config.json is invalid JSON after patching tools_root."
     echo "  File: $PROJECT_ROOT/.agentic_devops/config.json"
     exit 1
@@ -278,3 +282,13 @@ echo "  2. Run ./run_claude_architect.sh to start the Architect agent."
 echo "  3. Run ./run_claude_builder.sh to start the Builder agent."
 echo "  4. Run ./run_claude_qa.sh to start the QA agent."
 echo ""
+
+###############################################################################
+# 9. Python Environment Suggestion (Section 2.16)
+###############################################################################
+if [ ! -d "$PROJECT_ROOT/.venv" ]; then
+    echo "(Optional) Set up a Python virtual environment for optional dependencies:"
+    echo "  python3 -m venv .venv"
+    echo "  .venv/bin/pip install -r $SUBMODULE_NAME/requirements-optional.txt"
+    echo ""
+fi

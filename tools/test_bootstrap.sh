@@ -47,7 +47,11 @@ setup_sandbox() {
     cp "$SUBMODULE_SRC/tools/software_map/generate_tree.py" "$PROJECT/agentic-dev/tools/software_map/generate_tree.py"
     cp "$SUBMODULE_SRC/tools/critic/critic.py" "$PROJECT/agentic-dev/tools/critic/critic.py"
     cp "$SUBMODULE_SRC/tools/critic/run.sh" "$PROJECT/agentic-dev/tools/critic/run.sh"
-    chmod +x "$PROJECT/agentic-dev/tools/bootstrap.sh" "$PROJECT/agentic-dev/tools/sync_upstream.sh"
+    cp "$SUBMODULE_SRC/tools/resolve_python.sh" "$PROJECT/agentic-dev/tools/resolve_python.sh"
+    # Copy requirements files for Section 2.16 testing
+    cp "$SUBMODULE_SRC/requirements.txt" "$PROJECT/agentic-dev/requirements.txt" 2>/dev/null || true
+    cp "$SUBMODULE_SRC/requirements-optional.txt" "$PROJECT/agentic-dev/requirements-optional.txt" 2>/dev/null || true
+    chmod +x "$PROJECT/agentic-dev/tools/bootstrap.sh" "$PROJECT/agentic-dev/tools/sync_upstream.sh" "$PROJECT/agentic-dev/tools/resolve_python.sh"
 
     BOOTSTRAP="$PROJECT/agentic-dev/tools/bootstrap.sh"
     SYNC="$PROJECT/agentic-dev/tools/sync_upstream.sh"
@@ -548,6 +552,42 @@ if grep -q 'DIR/../../.agentic_devops/config.json' "$CDD_START"; then
 else
     log_fail "cdd/start.sh missing standalone config path"
 fi
+
+###############################################################################
+# Section 2.16: Bootstrap Prints Venv Suggestion When No Venv Exists
+###############################################################################
+echo ""
+echo "[Scenario] Bootstrap Prints Venv Suggestion When No Venv Exists"
+setup_sandbox
+
+OUTPUT=$("$BOOTSTRAP" 2>&1)
+if echo "$OUTPUT" | grep -q "requirements-optional.txt"; then
+    log_pass "Venv suggestion includes requirements-optional.txt path"
+else
+    log_fail "Venv suggestion missing when no .venv exists"
+fi
+if echo "$OUTPUT" | grep -qi "optional"; then
+    log_pass "Venv suggestion marked as optional"
+else
+    log_fail "Venv suggestion not marked as optional"
+fi
+
+cleanup_sandbox
+
+# --- Scenario: Bootstrap Omits Venv Suggestion When Venv Exists ---
+echo ""
+echo "[Scenario] Bootstrap Omits Venv Suggestion When Venv Exists"
+setup_sandbox
+mkdir -p "$PROJECT/.venv"
+
+OUTPUT=$("$BOOTSTRAP" 2>&1)
+if echo "$OUTPUT" | grep -q "requirements-optional.txt"; then
+    log_fail "Venv suggestion printed when .venv already exists"
+else
+    log_pass "Venv suggestion correctly omitted when .venv exists"
+fi
+
+cleanup_sandbox
 
 ###############################################################################
 # Results

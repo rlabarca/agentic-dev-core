@@ -17,4 +17,7 @@ if [ -z "${AGENTIC_PROJECT_ROOT:-}" ]; then
     fi
 fi
 
-exec python3 "$SCRIPT_DIR/critic.py" "$@"
+# Source shared Python resolver (python_environment.md §2.2)
+source "$SCRIPT_DIR/../resolve_python.sh"
+
+exec "$PYTHON_EXE" "$SCRIPT_DIR/critic.py" "$@"

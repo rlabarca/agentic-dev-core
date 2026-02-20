@@ -23,6 +23,10 @@ else
     fi
 fi
 export AGENTIC_PROJECT_ROOT="$PROJECT_ROOT"
+
+# Source shared Python resolver (python_environment.md §2.2)
+source "$SCRIPT_DIR/../resolve_python.sh"
+
 cd "$PROJECT_ROOT"
 
 TEMP_FEATURE="features/_test_lifecycle_temp.md"
@@ -52,7 +56,7 @@ trap cleanup EXIT
 
 # Get lifecycle state for the temp feature from feature_status.json
 get_lifecycle() {
-    python3 -c "
+    "$PYTHON_EXE" -c "
 import json, sys
 try:
     with open('.agentic_devops/cache/feature_status.json') as f:
@@ -71,7 +75,7 @@ except Exception as e:
 # Get role_status field from critic.json
 get_role() {
     local role="$1"
-    python3 -c "
+    "$PYTHON_EXE" -c "
 import json, sys
 try:
     with open('tests/_test_lifecycle_temp/critic.json') as f:
