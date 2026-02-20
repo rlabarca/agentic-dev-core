@@ -1548,6 +1548,77 @@ Reqs.
         finally:
             critic.FEATURES_DIR = orig_features
 
+    def test_testing_with_zero_manual_scenarios_skips_qa_item(self):
+        """Features with 0 manual scenarios should not generate QA action items."""
+        import critic
+        orig_features = critic.FEATURES_DIR
+        # Create a temp feature with NO manual scenarios
+        tmp = tempfile.mkdtemp()
+        features_dir = os.path.join(tmp, 'features')
+        os.makedirs(features_dir)
+        content = """\
+# Feature: Auto Only
+
+> Label: "Tool: Auto Only"
+
+## 1. Overview
+Overview.
+
+## 2. Requirements
+Reqs.
+
+## 3. Scenarios
+
+### Automated Scenarios
+
+#### Scenario: Auto Test
+    Given X
+    When Y
+    Then Z
+
+## 4. Implementation Notes
+* Note.
+"""
+        with open(os.path.join(features_dir, 'auto_only.md'), 'w') as f:
+            f.write(content)
+        critic.FEATURES_DIR = features_dir
+        try:
+            cdd_status = {
+                'features': {
+                    'testing': [{'file': 'features/auto_only.md', 'label': 'Auto Only'}],
+                    'todo': [],
+                    'complete': [],
+                },
+            }
+            result = {
+                'feature_file': 'features/auto_only.md',
+                'spec_gate': {'status': 'PASS', 'checks': {}},
+                'implementation_gate': {
+                    'status': 'PASS',
+                    'checks': {
+                        'traceability': {'status': 'PASS', 'coverage': 1.0, 'detail': 'OK'},
+                        'policy_adherence': {'status': 'PASS', 'violations': [], 'detail': 'OK'},
+                        'structural_completeness': {'status': 'PASS', 'detail': 'OK'},
+                        'builder_decisions': {
+                            'status': 'PASS',
+                            'summary': {'CLARIFICATION': 0, 'AUTONOMOUS': 0,
+                                        'DEVIATION': 0, 'DISCOVERY': 0},
+                            'detail': 'OK',
+                        },
+                        'logic_drift': {'status': 'PASS', 'pairs': [], 'detail': 'OK'},
+                    },
+                },
+                'user_testing': {'status': 'CLEAN', 'bugs': 0,
+                                 'discoveries': 0, 'intent_drifts': 0},
+            }
+            items = generate_action_items(result, cdd_status=cdd_status)
+            qa_items = items['qa']
+            self.assertEqual(len(qa_items), 0,
+                             "Features with 0 manual scenarios should not generate QA items")
+        finally:
+            critic.FEATURES_DIR = orig_features
+            shutil.rmtree(tmp)
+
     def test_no_cdd_status_skips_testing_items(self):
         result = {
             'feature_file': 'features/test.md',
@@ -2098,7 +2169,17 @@ class TestRoleStatusBuilderDONE(unittest.TestCase):
 class TestRoleStatusBuilderFAIL(unittest.TestCase):
     """Scenario: Role Status Builder FAIL"""
 
-    def test_structural_fail_makes_builder_fail(self):
+    def test_structural_warn_makes_builder_fail(self):
+        """tests.json exists with status FAIL -> structural WARN -> Builder FAIL."""
+        result = _make_base_result()
+        result['implementation_gate']['checks']['structural_completeness'] = {
+            'status': 'WARN', 'detail': 'tests.json status is FAIL.',
+        }
+        status = compute_role_status(result)
+        self.assertEqual(status['builder'], 'FAIL')
+
+    def test_structural_fail_makes_builder_todo(self):
+        """tests.json missing/malformed -> structural FAIL -> Builder TODO."""
         result = _make_base_result()
         result['implementation_gate']['checks']['structural_completeness'] = {
             'status': 'FAIL', 'detail': 'Missing tests.json.',
@@ -2110,7 +2191,7 @@ class TestRoleStatusBuilderFAIL(unittest.TestCase):
             'description': 'Fix failing tests.',
         }]
         status = compute_role_status(result)
-        self.assertEqual(status['builder'], 'FAIL')
+        self.assertEqual(status['builder'], 'TODO')
 
 
 class TestRoleStatusBuilderINFEASIBLE(unittest.TestCase):

@@ -833,15 +833,16 @@ def generate_action_items(feature_result, cdd_status=None):
                 scenarios = parse_scenarios(content)
                 manual_count = sum(
                     1 for s in scenarios if s.get('is_manual', False))
-                qa_items.append({
-                    'priority': 'MEDIUM',
-                    'category': 'testing_status',
-                    'feature': feature_name,
-                    'description': (
-                        f'Verify {feature_name}: '
-                        f'{manual_count} manual scenario(s)'
-                    ),
-                })
+                if manual_count > 0:
+                    qa_items.append({
+                        'priority': 'MEDIUM',
+                        'category': 'testing_status',
+                        'feature': feature_name,
+                        'description': (
+                            f'Verify {feature_name}: '
+                            f'{manual_count} manual scenario(s)'
+                        ),
+                    })
                 break
 
     # SPEC_UPDATED discoveries -> MEDIUM QA
@@ -1018,9 +1019,9 @@ def compute_role_status(feature_result, cdd_status=None):
     elif open_spec_disputes:
         builder_status = 'BLOCKED'
     elif struct_status == 'FAIL' or struct_status == 'WARN':
-        # tests.json FAIL -> FAIL status
-        # tests.json WARN means status is FAIL (exists but not PASS)
-        if struct_status == 'FAIL':
+        # struct WARN = tests.json exists with status FAIL -> Builder FAIL (spec 2.11)
+        # struct FAIL = tests.json missing/malformed -> Builder TODO (action item)
+        if struct_status == 'WARN':
             builder_status = 'FAIL'
         else:
             builder_status = 'TODO'
