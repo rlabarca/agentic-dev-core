@@ -15,7 +15,7 @@ Generates a visual and machine-readable representation of the project's feature 
 *   **Mermaid Export:** Generates Mermaid diagrams for documentation and the interactive web view.
 
 ### 2.2 Machine-Readable Output (Agent Interface)
-*   **Canonical File:** The generator MUST produce a `dependency_graph.json` file at `tools/software_map/dependency_graph.json`.
+*   **Canonical File:** The generator MUST produce a `dependency_graph.json` file at `.agentic_devops/cache/dependency_graph.json`.
 *   **Schema:** The JSON file MUST contain the following structure:
     ```json
     {
@@ -67,7 +67,7 @@ These scenarios are validated by the Builder's automated test suite.
     And the Mermaid export files are regenerated
 
 #### Scenario: Agent Reads Dependency Graph
-    Given dependency_graph.json exists at tools/software_map/dependency_graph.json
+    Given dependency_graph.json exists at .agentic_devops/cache/dependency_graph.json
     When an agent needs to query the dependency graph
     Then the agent reads dependency_graph.json directly
     And the agent does NOT use the web UI or parse Mermaid files
@@ -117,7 +117,7 @@ These scenarios MUST NOT be validated through automated tests. The Builder MUST 
 ## 4. Implementation Notes
 *   **Test Scope:** Automated tests MUST only cover graph generation, cycle detection, and `dependency_graph.json` output. The web UI MUST NOT be tested through automated tests. The Builder MUST NOT start the server. After passing automated tests, the Builder should use the `[Ready for Verification]` status tag and instruct the User to start the server (`tools/software_map/start.sh`) and visually verify the web view.
 *   **Acyclic Mandate:** The tool is the primary enforcer of the acyclic graph rule defined in the workflow.
-*   **Agent Interface:** `dependency_graph.json` is the single machine-readable contract. All agent tooling (Context Clear Protocol, Dependency Integrity checks, Release Protocol) MUST read this file.
+*   **Agent Interface:** `.agentic_devops/cache/dependency_graph.json` is the single machine-readable contract. All agent tooling (Context Clear Protocol, Dependency Integrity checks, Release Protocol) MUST read this file. The generator writes to this cache location per submodule_bootstrap Section 2.12.
 *   **Cycle Detection:** Uses DFS with 3-color marking (WHITE/GRAY/BLACK). External prerequisites (not in the features directory) are skipped without triggering false positives.
 *   **File Watch Mode:** `serve.py` polls `features/` directory every 2 seconds using `os.scandir` mtime snapshots. No external dependencies required (no `watchdog`).
 *   **Deterministic JSON:** `dependency_graph.json` uses `sort_keys=True` on `json.dump` and all arrays are pre-sorted by filename/path before serialization.

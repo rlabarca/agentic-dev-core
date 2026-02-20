@@ -150,7 +150,7 @@ The Critic MUST generate imperative action items for each role based on the anal
 *   **MEDIUM** -- Traceability gaps, SPEC_UPDATED items awaiting re-verification.
 *   **LOW** -- Gate WARNs, informational items.
 
-**CDD Feature Status Dependency:** Builder and QA action items that depend on CDD feature status (TODO or TESTING state) require `tools/cdd/feature_status.json` to exist on disk. If unavailable, the Critic skips lifecycle-dependent items with a note in the report.
+**CDD Feature Status Dependency:** Builder and QA action items that depend on CDD feature status (TODO or TESTING state) require `.agentic_devops/cache/feature_status.json` to exist on disk. If unavailable, the Critic skips lifecycle-dependent items with a note in the report.
 
 ### 2.11 Role Status Computation
 The Critic MUST compute a `role_status` object for each feature, summarizing whether each agent role has outstanding work. This is the primary input for CDD's role-based dashboard.
@@ -168,7 +168,7 @@ The Critic MUST compute a `role_status` object for each feature, summarizing whe
 
 **Builder Precedence (highest wins):** INFEASIBLE > BLOCKED > FAIL > TODO > DONE.
 
-**Builder Lifecycle State Dependency:** Builder status computation requires `tools/cdd/feature_status.json` to determine the feature's lifecycle state. If the feature is in TODO lifecycle state, Builder is TODO regardless of traceability or test status -- the spec has changed and the implementation must be reviewed. If `feature_status.json` is unavailable, lifecycle-based TODO detection is skipped with a note in the report.
+**Builder Lifecycle State Dependency:** Builder status computation requires `.agentic_devops/cache/feature_status.json` to determine the feature's lifecycle state. If the feature is in TODO lifecycle state, Builder is TODO regardless of traceability or test status -- the spec has changed and the implementation must be reviewed. If `feature_status.json` is unavailable, lifecycle-based TODO detection is skipped with a note in the report.
 
 **QA Status:**
 *   `FAIL`: Has OPEN BUGs in User Testing Discoveries. (Lifecycle-independent.)
@@ -181,7 +181,7 @@ The Critic MUST compute a `role_status` object for each feature, summarizing whe
 
 **Lifecycle independence:** FAIL, DISPUTED, and TODO (from conditions b/c) are evaluated regardless of the feature's lifecycle state. A spec modification that resets the feature to TODO lifecycle does NOT suppress existing QA findings. N/A requires the complete absence of QA engagement (no open items of any kind).
 
-**Lifecycle State Dependency:** QA status computation uses `tools/cdd/feature_status.json` to determine the feature's lifecycle state (TODO/TESTING/COMPLETE) for lifecycle-dependent statuses (TESTING-based TODO, COMPLETE-based CLEAN). If unavailable, lifecycle-dependent statuses are skipped. Statuses derived from user testing items (FAIL, DISPUTED, and TODO from conditions b/c) are always computed since they do not depend on lifecycle state. If feature_status.json is unavailable AND no user testing items exist, QA status defaults to `N/A` with a note in the report.
+**Lifecycle State Dependency:** QA status computation uses `.agentic_devops/cache/feature_status.json` to determine the feature's lifecycle state (TODO/TESTING/COMPLETE) for lifecycle-dependent statuses (TESTING-based TODO, COMPLETE-based CLEAN). If unavailable, lifecycle-dependent statuses are skipped. Statuses derived from user testing items (FAIL, DISPUTED, and TODO from conditions b/c) are always computed since they do not depend on lifecycle state. If feature_status.json is unavailable AND no user testing items exist, QA status defaults to `N/A` with a note in the report.
 
 ### 2.12 Untracked File Audit
 The Critic MUST detect untracked files in the working directory and generate Architect action items for triage.

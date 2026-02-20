@@ -2,6 +2,7 @@
 
 > Label: "Tool: CDD Monitor"
 > Category: "DevOps Tools"
+> Prerequisite: features/arch_critic_policy.md
 
 
 ## 1. Overview
@@ -68,10 +69,19 @@ The Continuous Design-Driven (CDD) Monitor tracks the status of all feature file
     *   No per-feature `test_status` or `qa_status` fields (replaced by role columns).
     *   Role fields (`architect`, `builder`, `qa`) are omitted when no `critic.json` exists for that feature (dashboard shows `??`).
     *   Array sorted by file path (deterministic).
-*   **Internal Artifact (`feature_status.json`):** The monitor MUST also produce a `feature_status.json` file at `tools/cdd/feature_status.json`, regenerated on every request. This file retains the **old** lifecycle-based format with `todo`/`testing`/`complete` arrays and `test_status` fields. This is an internal implementation detail consumed by the Critic for lifecycle-state-dependent computations (e.g., QA TODO detection). It is NOT part of the public API contract.
+*   **Internal Artifact (`feature_status.json`):** The monitor MUST also produce a `feature_status.json` file at `.agentic_devops/cache/feature_status.json`, regenerated on every request (web) or CLI invocation. This file retains the **old** lifecycle-based format with `todo`/`testing`/`complete` arrays and `test_status` fields. This is an internal implementation detail consumed by the Critic for lifecycle-state-dependent computations (e.g., QA TODO detection). It is NOT part of the public API contract.
 *   **Regeneration:** Both outputs MUST be freshly computed on every `/status.json` request. The disk file is also regenerated on dashboard requests.
 *   **Deterministic Output:** Arrays MUST be sorted by file path. Keys MUST be sorted.
-*   **Agent Contract:** Agents MUST query status via `curl http://localhost:<port>/status.json` where `<port>` is read from `.agentic_devops/config.json` (`cdd_port`, default `8086`). Agents MUST NOT scrape the web dashboard or guess ports.
+*   **Agent Contract:** Agents MUST query status via `tools/cdd/status.sh`, which outputs the same JSON schema to stdout without requiring the web server. Agents MUST NOT scrape the web dashboard, use HTTP endpoints, or guess ports.
+
+### 2.6 CLI Status Tool (Agent Interface)
+*   **Script Location:** `tools/cdd/status.sh` (executable, `chmod +x`). Wrapper calls a Python module for status computation.
+*   **Purpose:** Provides agents with feature status without requiring the web server to be running. This is the primary agent interface for CDD status queries.
+*   **Output:** Writes the same JSON schema as the `/status.json` API endpoint to stdout. The output MUST be valid JSON parseable by `python3 json.load()`.
+*   **Side Effect:** Regenerates `.agentic_devops/cache/feature_status.json` (the internal lifecycle-based artifact consumed by the Critic).
+*   **Project Root Detection:** Uses `AGENTIC_PROJECT_ROOT` if set, then climbing fallback (per submodule_bootstrap Section 2.11).
+*   **No Server Dependency:** The tool MUST NOT depend on the web server being running. It computes status directly from disk (feature files, git history, critic.json files).
+*   **Shared Logic:** The status computation logic MUST be consistent with the web server's `/status.json` endpoint. Implementation MAY share code with `serve.py` or extract a common module.
 
 ### 2.5 Role Status Integration
 *   **Critic JSON Discovery:** For each feature `features/<name>.md`, the monitor checks for `tests/<name>/critic.json` on disk.
@@ -137,8 +147,22 @@ These scenarios are validated by the Builder's automated test suite.
 #### Scenario: Internal Feature Status File Preserved
     Given the CDD server is running
     When any request is made to the server
-    Then tools/cdd/feature_status.json is regenerated with the old lifecycle-based format
+    Then .agentic_devops/cache/feature_status.json is regenerated with the old lifecycle-based format
     And it contains todo, testing, and complete arrays with test_status fields
+
+#### Scenario: CLI Status Tool Output
+    Given feature files exist in features/ with various lifecycle states
+    And critic.json files exist for some features
+    When an agent runs tools/cdd/status.sh
+    Then valid JSON is written to stdout matching the /status.json schema
+    And .agentic_devops/cache/feature_status.json is regenerated
+    And the tool does not require the CDD web server to be running
+
+#### Scenario: CLI Status Tool Project Root Detection
+    Given AGENTIC_PROJECT_ROOT is set to a valid project root
+    When an agent runs tools/cdd/status.sh
+    Then the tool uses AGENTIC_PROJECT_ROOT for all path resolution
+    And it scans features/ relative to that root
 
 ### Manual Scenarios (Human Verification Required)
 These scenarios MUST NOT be validated through automated tests. The Builder must start the server and instruct the User to verify the web dashboard visually.
@@ -178,7 +202,7 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
 *   **Server-Side Rendering:** The HTML is generated dynamically per request (no static `index.html`). Auto-refreshes every 5 seconds via `<meta http-equiv="refresh">`.
 *   **Status Logic:** `COMPLETE` requires `complete_ts > test_ts` AND either `file_mod_ts <= complete_ts` OR the only changes since the status commit are in the `## User Testing Discoveries` section (discovery-aware lifecycle preservation). To check: retrieve the file content at the status commit hash via `git show <hash>:<path>`, strip the `## User Testing Discoveries` section and everything below from both versions, and compare. If the spec content above discoveries is identical, preserve the lifecycle state. Otherwise reset to `TODO`.
 *   **Escape Sequences:** Git grep patterns use `\\[` / `\\]` in f-strings to avoid Python 3.12+ deprecation warnings for invalid escape sequences.
-*   **Agent Interface:** The `/status.json` API endpoint is the primary machine-readable contract. All agent tooling (Status Management, Context Clear Protocol, Release Protocol Zero-Queue checks) MUST use `curl http://localhost:<cdd_port>/status.json`. The disk file `feature_status.json` is a secondary artifact. Agents MUST read the port from `.agentic_devops/config.json` (`cdd_port` key, default `8086`) and MUST NOT hardcode or guess port numbers.
+*   **Agent Interface:** `tools/cdd/status.sh` is the primary agent interface. All agent tooling (Status Management, Context Clear Protocol, Release Protocol Zero-Queue checks) MUST use `tools/cdd/status.sh` for status queries. The `/status.json` web endpoint provides the same data for human tooling or when the server is running. Agents MUST NOT use HTTP endpoints, scrape the web dashboard, or guess port numbers.
 *   **Path Normalization:** `os.path.relpath` may resolve to `.`, making `features_rel` = `./features`. The `f_path` used for git grep MUST be normalized with `os.path.normpath()` to strip the `./` prefix, otherwise status commit patterns like `[Complete features/file.md]` won't match `./features/file.md`.
 *   **Section Heading Underline:** Section headings ("ACTIVE", "COMPLETE") require a visible underline separator to distinguish them from feature rows. Verified 2026-02-19.
 *   **Badge "??" for missing critic.json:** SPEC_DISPUTE resolved -- spec updated from "--" to "??" for missing critic data. Verified 2026-02-20.

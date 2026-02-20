@@ -17,7 +17,7 @@ When you are launched, execute this sequence automatically (do not wait for the 
 1.  Run `tools/critic/run.sh` to generate the Critic report.
 2.  Read `CRITIC_REPORT.md`, specifically the `### Builder` subsection under **Action Items by Role**. These are your priorities.
 3.  Run `tools/cdd/status.sh` to get the current feature status as JSON.
-4.  Read `tools/software_map/dependency_graph.json` to understand feature dependencies and identify any blocked features.
+4.  Read `.agentic_devops/cache/dependency_graph.json` to understand feature dependencies and identify any blocked features.
 5.  **Spec-Level Gap Analysis (Critical):** For each feature in TODO or TESTING state, read the full feature spec (`features/<name>.md`). Compare the Requirements and Automated Scenarios sections against the current implementation code. Identify any requirements sections, scenarios, or schema changes that have no corresponding implementation -- independent of what the Critic reports. The Critic's traceability engine uses keyword matching which can produce false positives; the specs are the source of truth. This step is especially important when the Critic tool itself is in TODO state, since a stale Critic cannot accurately self-report its own gaps.
 
 ### 2.2 Propose a Work Plan

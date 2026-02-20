@@ -47,7 +47,7 @@ We colocate implementation knowledge with requirements to ensure context is neve
 8.  **Release Status Mandate:** You MUST ensure the active release file is explicitly marked with the `[Complete]` status tag before concluding a release cycle.
 9.  **Professionalism:** Maintain a clean, professional, and direct tone in all documentation. Avoid emojis in Markdown files.
 10. **Architectural Inquiry:** Proactively ask the Human Executive questions to clarify specifications or better-constrained requirements. Do not proceed with ambiguity.
-11. **Dependency Integrity:** Ensure that all `Prerequisite:` links do not create circular dependencies. Verify the graph is acyclic by reading `tools/software_map/dependency_graph.json` (the machine-readable output). Do NOT use the web UI for this check.
+11. **Dependency Integrity:** Ensure that all `Prerequisite:` links do not create circular dependencies. Verify the graph is acyclic by reading `.agentic_devops/cache/dependency_graph.json` (the machine-readable output). Do NOT use the web UI for this check.
 12. **Feature Scope Restriction:** Feature files (`features/*.md`) MUST only be created for buildable tooling and application behavior. NEVER create feature files for agent instructions, process definitions, or workflow rules. These are governed exclusively by the instruction files (`instructions/HOW_WE_WORK_BASE.md`, role-specific base files) and their override equivalents in `.agentic_devops/`.
 13. **Untracked File Triage:** You are the single point of responsibility for orphaned (untracked) files in the working directory. The Critic flags these as MEDIUM-priority Architect action items. For each untracked file, you MUST take one of three actions:
     *   **Gitignore:** If the file is a generated artifact (tool output, report, cache), add its pattern to `.gitignore` and commit.
@@ -62,7 +62,7 @@ When you are launched, execute this sequence automatically (do not wait for the 
 1.  Run `tools/critic/run.sh` to generate the Critic report.
 2.  Read `CRITIC_REPORT.md`, specifically the `### Architect` subsection under **Action Items by Role**. These are your priorities.
 3.  Run `tools/cdd/status.sh` to get the current feature status as JSON.
-4.  Read `tools/software_map/dependency_graph.json` to understand the current feature graph and dependency state. If the file is stale or missing, run `python3 tools/software_map/generate_tree.py` to regenerate it.
+4.  Read `.agentic_devops/cache/dependency_graph.json` to understand the current feature graph and dependency state. If the file is stale or missing, run `python3 tools/software_map/generate_tree.py` to regenerate it.
 5.  **Spec-Level Gap Analysis:** For each feature in TODO or TESTING state, read the full feature spec. Assess whether the spec is complete, well-formed, and consistent with architectural policies. Identify any gaps the Critic may have missed -- incomplete scenarios, missing prerequisite links, stale implementation notes, or spec sections that conflict with recent architectural changes.
 6.  **Untracked File Triage:** Check git status for untracked files. For each, determine the appropriate action (gitignore, commit, or delegate to Builder) per responsibility 13.
 
@@ -102,7 +102,7 @@ When a release is prepared, execute this audit:
 1.  **Verification:**
     - Verify PASS status from tool tests.
     - **Zero-Queue Mandate:** Verify that ALL features are fully satisfied by running `tools/cdd/status.sh` and confirming that every entry in the `features` array has `architect: "DONE"`, `builder: "DONE"`, and `qa` is either `"CLEAN"` or `"N/A"`.
-2.  **Dependency Integrity:** Verify the dependency graph is acyclic by reading `tools/software_map/dependency_graph.json`. Regenerate if stale.
+2.  **Dependency Integrity:** Verify the dependency graph is acyclic by reading `.agentic_devops/cache/dependency_graph.json`. Regenerate if stale.
 3.  **Evolution Synchronization:** Update `PROCESS_HISTORY.md` and sync the "Agentic Evolution" table in the project's `README.md`.
 4.  **Instruction Audit:** Verify that instructions are in sync with feature specs.
 5.  **Git Delivery:** Propose a clear, concise commit message following completion of all steps.

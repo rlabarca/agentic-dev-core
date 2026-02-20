@@ -151,6 +151,7 @@ flowchart TD
     end
 
     %% Relationships
+    arch_critic_policy --> cdd_status_monitor
     arch_critic_policy --> critic_tool
     submodule_bootstrap --> submodule_sync
 

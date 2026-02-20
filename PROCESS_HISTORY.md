@@ -2,6 +2,22 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-20] CDD CLI Tool Spec + Artifact Path Alignment
+
+- **Problem 1 (CDD status.sh):** All agent instruction files reference `tools/cdd/status.sh` as the CLI agent interface for feature status (added in the D4 architectural decision), but the CDD feature spec (`cdd_status_monitor.md`) never defined it as a requirement. The tool does not exist. Agents cannot follow their documented startup protocols.
+- **Problem 2 (Stale artifact paths):** The submodule_bootstrap spec (Section 2.12) mandates generated artifacts at `.agentic_devops/cache/` and `.agentic_devops/runtime/`, but the CDD spec still referenced `tools/cdd/feature_status.json`, the Software Map spec still referenced `tools/software_map/dependency_graph.json`, and the Architect/Builder instructions still referenced the old Software Map path. The `.gitignore` also lacked entries for the new cache/runtime directories, causing untracked file noise.
+- **Problem 3 (Policy anchoring):** The CDD spec had no prerequisite link despite depending on the Critic's `role_status` output contract.
+- **Solution:**
+    - Added Section 2.6 (CLI Status Tool) to `cdd_status_monitor.md` defining `tools/cdd/status.sh` as a CLI entry point with JSON stdout output and `feature_status.json` regeneration as a side effect.
+    - Updated CDD spec Section 2.4: internal artifact path to `.agentic_devops/cache/feature_status.json`, agent contract to reference `status.sh`.
+    - Updated Software Map spec Section 2.2: canonical file path to `.agentic_devops/cache/dependency_graph.json`.
+    - Updated `critic_tool.md` Sections 2.10-2.11: all `feature_status.json` references to new cache path.
+    - Updated `ARCHITECT_BASE.md` and `BUILDER_BASE.md`: `dependency_graph.json` references to new cache path.
+    - Added `.agentic_devops/cache/` and `.agentic_devops/runtime/` to `.gitignore`.
+    - Added `> Prerequisite: features/arch_critic_policy.md` to `cdd_status_monitor.md`.
+- **Files Modified:** `features/cdd_status_monitor.md`, `features/critic_tool.md`, `features/software_map_generator.md`, `instructions/ARCHITECT_BASE.md`, `instructions/BUILDER_BASE.md`, `.gitignore`, `PROCESS_HISTORY.md`.
+- **Impact:** CDD spec now defines the CLI tool that all instructions reference. Builder must implement `tools/cdd/status.sh`. Feature specs and instructions are now consistent with the submodule artifact isolation mandate.
+
 ## [2026-02-20] Documentation Drift: Submodule Update + README Directory (D11, D12, D13)
 - **D11 (submodule update):** HOW_WE_WORK_BASE Section 6 said upstream updates are pulled via `git submodule update`, which pins to the parent's recorded commit (doesn't fetch latest). Updated to `cd agentic-dev && git pull origin main && cd ..` to match the README's correct workflow.
 - **D12-D13 (README directory):** `PROCESS_HISTORY.md` was missing from the README's Directory Structure section despite being a root-level workflow artifact created by bootstrap. Added it.
