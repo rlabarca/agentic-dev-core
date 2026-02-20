@@ -328,4 +328,4 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
 - **Observed Behavior:** The CDD web dashboard does not have a "Run Critic" button in the top-right area next to the last-updated timestamp. The button is entirely absent from the UI.
 - **Expected Behavior:** Per the "Run Critic Button" manual scenario, a "Run Critic" button should be visible in the top-right area. Clicking it should run the Critic, enter a loading state, then refresh the dashboard with updated role status columns.
 - **Action Required:** Builder
-- **Status:** OPEN
+- **Status:** RESOLVED
