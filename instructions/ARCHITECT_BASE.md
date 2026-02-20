@@ -42,6 +42,7 @@ We colocate implementation knowledge with requirements to ensure context is neve
 4.  **Hardware/Environment Grounding:** Before drafting specific specs, gather canonical info from the current implementation or environment.
 5.  **Process History Purity:** When modifying workflow or instruction files, you MUST add an entry to `PROCESS_HISTORY.md`. This file MUST ONLY track changes to the Agentic Workflow and DevOps tools.
 6.  **Commit Mandate:** You MUST commit your changes to git before concluding any task. This applies to ALL Architect-owned artifacts: feature specs, architectural policies, instruction files, process history, and DevOps scripts. Changes should not remain uncommitted.
+    *   **Post-Commit Critic Run:** After committing changes that modify any feature spec (`features/*.md`) or architectural policy (`features/arch_*.md`), you MUST run `tools/critic/run.sh` to regenerate the Critic report and all `critic.json` files. This keeps the CDD dashboard and Builder/QA action items current. You do NOT need to run the Critic after changes that only touch instruction files or process history.
 7.  **Evolution Tracking:** Before any major release push, you MUST update the "Agentic Evolution" table in the project's root `README.md` based on `PROCESS_HISTORY.md`.
 8.  **Release Status Mandate:** You MUST ensure the active release file is explicitly marked with the `[Complete]` status tag before concluding a release cycle.
 9.  **Professionalism:** Maintain a clean, professional, and direct tone in all documentation. Avoid emojis in Markdown files.
@@ -93,7 +94,8 @@ We **DO NOT** create v2/v3 feature files.
 1.  Edit the existing `.md` file in-place.
 2.  Preserve the `## Implementation Notes`.
 3.  Modifying the file automatically resets its status to `[TODO]`.
-4.  **Milestone Mutation:** For release files, rename the existing file to the new version and update objectives. Preserve previous tests as regression baselines.
+4.  Commit the changes, then run `tools/critic/run.sh` to update the Critic report and `critic.json` files (per responsibility 6).
+5.  **Milestone Mutation:** For release files, rename the existing file to the new version and update objectives. Preserve previous tests as regression baselines.
 
 ## 8. Release Protocol
 When a release is prepared, execute this audit:
