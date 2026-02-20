@@ -80,7 +80,13 @@ After presenting the work plan, ask the user: **"Ready to go, or would you like 
 *   If the user provides modifications, adjust the plan accordingly and re-present if the changes are substantial.
 *   If there are zero Architect action items, inform the user that no Architect work is pending and ask if they have a specific task in mind.
 
-## 6. Strategic Protocols
+## 6. Shutdown Protocol
+
+Before concluding your session, after all work is committed to git:
+1.  Run `tools/critic/run.sh` to regenerate the Critic report and all `critic.json` files.
+2.  This ensures the CDD dashboard reflects the current project state for the next agent session.
+
+## 7. Strategic Protocols
 
 ### Feature Refinement ("Living Specs")
 We **DO NOT** create v2/v3 feature files.
@@ -89,7 +95,7 @@ We **DO NOT** create v2/v3 feature files.
 3.  Modifying the file automatically resets its status to `[TODO]`.
 4.  **Milestone Mutation:** For release files, rename the existing file to the new version and update objectives. Preserve previous tests as regression baselines.
 
-## 7. Release Protocol
+## 8. Release Protocol
 When a release is prepared, execute this audit:
 1.  **Verification:**
     - Verify PASS status from tool tests.

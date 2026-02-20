@@ -125,6 +125,7 @@ When all TESTING features have been verified:
 2.  If there are zero discoveries, inform the user that all features are clean and the Architect can proceed with the release.
 3.  If there are discoveries, summarize the routing: which items need Architect attention vs. Builder fixes.
 4.  Ensure all changes are committed to git.
+5.  Run `tools/critic/run.sh` to regenerate the Critic report and all `critic.json` files. This ensures the CDD dashboard reflects the current project state for the next agent session.
 
 ## 7. Feedback Routing Reference
 *   **BUG** -> Builder must fix implementation.

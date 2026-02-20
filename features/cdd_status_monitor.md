@@ -36,13 +36,14 @@ The Continuous Design-Driven (CDD) Monitor tracks the status of all feature file
 | BLOCKED | Gray | Builder |
 | DISPUTED | Orange | QA |
 | N/A | Blank/dim | QA |
-| -- | Blank | Any (no critic.json) |
+| ?? | Blank/dim | Any (no critic.json -- not yet generated) |
 
 *   **Scope:** The web dashboard is for human consumption only. Agents must use the `/status.json` API endpoint.
 
 ### 2.3 Verification Signals
 *   **Role Status Source:** The CDD monitor reads role status from pre-computed `tests/<name>/critic.json` files produced by the Critic tool. CDD does NOT compute role status itself.
 *   **Test Status (Internal):** The monitor still resolves `tests/<name>/tests.json` for internal lifecycle logic, but test status is no longer displayed as a separate column on the dashboard or exposed as a standalone field in the API. Test pass/fail state is reflected through the Builder role status (DONE vs FAIL).
+*   **Section Heading Visual Separation:** The dashboard MUST render section headings ("ACTIVE", "COMPLETE") with an underline separator (e.g., a bottom border or `<hr>`) to clearly distinguish them from the feature rows beneath.
 
 ### 2.4 Machine-Readable Output (Agent Interface)
 *   **API Endpoint:** The server MUST expose a `/status.json` route that returns the feature status JSON directly with `Content-Type: application/json`. This is the **primary** agent interface.
@@ -64,7 +65,7 @@ The Continuous Design-Driven (CDD) Monitor tracks the status of all feature file
     *   Flat `features` array (no `todo`/`testing`/`complete` sub-arrays).
     *   No top-level `test_status` field.
     *   No per-feature `test_status` or `qa_status` fields (replaced by role columns).
-    *   Role fields (`architect`, `builder`, `qa`) are omitted when no `critic.json` exists for that feature (dashboard shows `--`).
+    *   Role fields (`architect`, `builder`, `qa`) are omitted when no `critic.json` exists for that feature (dashboard shows `??`).
     *   Array sorted by file path (deterministic).
 *   **Internal Artifact (`feature_status.json`):** The monitor MUST also produce a `feature_status.json` file at `tools/cdd/feature_status.json`, regenerated on every request. This file retains the **old** lifecycle-based format with `todo`/`testing`/`complete` arrays and `test_status` fields. This is an internal implementation detail consumed by the Critic for lifecycle-state-dependent computations (e.g., QA TODO detection). It is NOT part of the public API contract.
 *   **Regeneration:** Both outputs MUST be freshly computed on every `/status.json` request. The disk file is also regenerated on dashboard requests.
@@ -73,7 +74,7 @@ The Continuous Design-Driven (CDD) Monitor tracks the status of all feature file
 
 ### 2.5 Role Status Integration
 *   **Critic JSON Discovery:** For each feature `features/<name>.md`, the monitor checks for `tests/<name>/critic.json` on disk.
-*   **Per-Feature Role Status:** If `critic.json` exists, the monitor reads the `role_status` object and exposes its `architect`, `builder`, and `qa` fields on the per-feature API entry. If no `critic.json` exists, all role fields are omitted (dashboard shows `--` in each column).
+*   **Per-Feature Role Status:** If `critic.json` exists, the monitor reads the `role_status` object and exposes its `architect`, `builder`, and `qa` fields on the per-feature API entry. If no `critic.json` exists, all role fields are omitted (dashboard shows `??` in each column).
 *   **No Direct Computation:** CDD does NOT compute role status itself. It reads pre-computed values from the Critic's `role_status` output.
 *   **Dashboard Columns:** Each feature entry on the web dashboard displays Architect, Builder, and QA columns with the badge/color mapping defined in Section 2.2. Blank cells when no `critic.json` exists.
 *   **No Blocking:** The `critic_gate_blocking` config key is deprecated (no-op). CDD does not gate status transitions based on critic or role status results.
@@ -132,7 +133,7 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
     Then features are grouped into Active and Complete sections
     And the table has columns for Feature, Architect, Builder, and QA
     And badges use the defined color mapping (DONE/CLEAN=green, TODO=yellow, FAIL/INFEASIBLE=red, BLOCKED=gray, DISPUTED=orange)
-    And cells show "--" when no critic.json exists for that feature
+    And cells show "??" when no critic.json exists for that feature
 
 #### Scenario: Web Dashboard Auto-Refresh
     Given the User is viewing the web dashboard
@@ -144,8 +145,14 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
     And critic.json files exist for some features
     When the User opens the web dashboard
     Then each feature with a critic.json shows role status badges in the Architect, Builder, and QA columns
-    And features without critic.json show "--" in all role columns
+    And features without critic.json show "??" in all role columns
     And the Active section sorts features by urgency (red states first, then yellow/orange, then alphabetical)
+
+#### Scenario: Section Heading Visual Separation
+    Given the CDD server is running
+    When the User opens the web dashboard
+    Then the "ACTIVE" and "COMPLETE" section headings have an underline separator
+    And the headings are clearly distinguished from the feature table rows beneath them
 
 ## 4. Implementation Notes
 *   **Test Scope:** Automated tests MUST only cover the `/status.json` API endpoint and the underlying status logic. The web dashboard HTML rendering and visual layout MUST NOT be tested through automated tests. The Builder MUST NOT start the CDD server. After passing automated tests, the Builder should use the `[Ready for Verification]` status tag and instruct the User to start the server (`tools/cdd/start.sh`) and visually verify the dashboard.
@@ -165,11 +172,11 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
 - **Observed Behavior:** The spec defines "--" as the badge when no critic.json exists. This is visually ambiguous and easily confused with a rendering gap or empty cell.
 - **Expected Behavior:** Use "??" to clearly indicate "not yet generated" state. Keep "N/A" for "not applicable / not needed." The badge table in Section 2.2 and all scenario references to "--" should be updated to "??". This distinction makes the Builder's intent unambiguous: "??" = critic data missing, "N/A" = QA verification not required.
 - **Action Required:** Architect
-- **Status:** OPEN
+- **Status:** SPEC_UPDATED
 
 ### [DISCOVERY] Section headings "ACTIVE" and "COMPLETE" lack visual distinction (Discovered: 2026-02-19)
-- **Scenario:** NONE
+- **Scenario:** Section Heading Visual Separation (added)
 - **Observed Behavior:** The "ACTIVE" and "COMPLETE" section headings blend into the dashboard without clear visual separation from the feature rows below them.
 - **Expected Behavior:** Section headings should have an underline (or similar separator) to clearly distinguish them from the table content beneath.
 - **Action Required:** Architect
-- **Status:** OPEN
+- **Status:** SPEC_UPDATED

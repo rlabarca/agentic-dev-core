@@ -2,6 +2,19 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-20] Agent Shutdown Protocol: Critic Regeneration on Exit
+- **Problem:** After an agent completed work and committed to git, the Critic report and `critic.json` files were not regenerated. This left the CDD dashboard showing stale role status until the next agent session ran the Critic at startup. Between sessions, the dashboard could show incorrect TODO/DONE states.
+- **Solution:** Added a Shutdown Protocol to all three agent instruction files requiring `tools/critic/run.sh` to be run after all work is committed, before concluding the session.
+- **Files Modified:** `instructions/ARCHITECT_BASE.md` (new Section 6), `instructions/BUILDER_BASE.md` (new Section 5), `instructions/QA_BASE.md` (new step 5 in Section 6).
+- **Impact:** No spec changes. Agent behavior only. Section numbers renumbered in Architect (Release Protocol -> 8) and Builder (Team Orchestration -> 6, Build Protocols -> 7).
+
+## [2026-02-20] CDD Spec: Resolve QA Discoveries (Badge and Heading Separation)
+- **SPEC_DISPUTE Resolved:** Changed the badge for missing `critic.json` from `--` to `??` throughout the spec (badge table in Section 2.2, API contract in Section 2.4, Role Status Integration in Section 2.5, and all scenario references). The `??` badge clearly indicates "not yet generated" vs `N/A` which means "not applicable."
+- **DISCOVERY Resolved:** Added a Section Heading Visual Separation requirement to Section 2.3 and a new Manual Scenario ("Section Heading Visual Separation") requiring underline separators beneath "ACTIVE" and "COMPLETE" headings.
+- **Discovery Statuses:** Both entries in `## User Testing Discoveries` updated from OPEN to SPEC_UPDATED.
+- **Files Modified:** `features/cdd_status_monitor.md`.
+- **Impact:** CDD spec reset to TODO. Builder must implement `??` badge rendering and section heading underlines.
+
 ## [2026-02-19] Builder Status: Lifecycle-Aware TODO Detection
 - **Problem:** When the Architect modifies a feature spec, the CDD lifecycle correctly resets the feature to TODO. But the Critic's Builder role_status still computes DONE because: (1) existing tests still pass (structural completeness PASS), (2) keyword-based traceability produces false-positive matches for new scenarios with similar names, (3) the Builder status computation ignores lifecycle state entirely. Result: the Builder's startup shows Builder=DONE and proposes zero work for a feature with real spec changes.
 - **Root Cause:** Builder status was computed purely from test/traceability/tag signals. The CDD lifecycle "Status Reset" (file edit after status commit resets to TODO) was invisible to Builder role_status.

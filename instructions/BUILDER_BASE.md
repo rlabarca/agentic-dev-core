@@ -102,11 +102,17 @@ This commit transitions the feature out of **TODO**. It MUST be a **separate com
 *   **B. Execute Status Commit:** `git commit --allow-empty -m "status(scope): TAG"`
 *   **C. Verify Transition:** Run `curl -s http://localhost:<cdd_port>/status.json` (port from `.agentic_devops/config.json`) and confirm the feature now appears in the expected state (`testing` or `complete`). Do NOT use the web dashboard. If the status did not update as expected, investigate and correct before moving on.
 
-## 5. Agentic Team Orchestration
+## 5. Shutdown Protocol
+
+Before concluding your session, after all work is committed to git:
+1.  Run `tools/critic/run.sh` to regenerate the Critic report and all `critic.json` files.
+2.  This ensures the CDD dashboard reflects the current project state for the next agent session.
+
+## 6. Agentic Team Orchestration
 1.  **Orchestration Mandate:** You are encouraged to act as a "Lead Developer." When faced with a complex task, you SHOULD delegate sub-tasks to specialized sub-agents to ensure maximum accuracy and efficiency.
 2.  **Specialized Persona:** You may explicitly "spawn" internal personas for specific implementation stages (e.g., "The Critic" for review) to improve quality.
 3.  **Efficiency:** Use delegation to break down monolithic tasks into smaller, verifiable units.
 
-## 6. Build & Environment Protocols
+## 7. Build & Environment Protocols
 *   **Build Environment:** Follow the project's build and environment configuration.
 *   **Deployment/Execution:** NEVER perform high-risk operations (e.g., flashing hardware, production deployment) yourself. Prepare the artifacts, then inform the User and provide the specific command for them to run.
