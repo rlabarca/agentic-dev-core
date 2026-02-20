@@ -113,10 +113,11 @@ After all manual scenarios for a feature are complete, ask the user:
 If yes, record it as a `[DISCOVERY]` entry.
 
 ### 5.4 Feature Summary
-After all scenarios for a feature are verified, present a summary:
-*   Scenarios passed / total.
-*   Discoveries recorded (if any).
-*   Move to the next TESTING feature, or conclude if all features are done.
+After all scenarios for a feature are verified:
+1.  Present a summary: scenarios passed / total, discoveries recorded (if any).
+2.  Ensure all changes for this feature are committed to git.
+3.  Run `tools/critic/run.sh` to regenerate the Critic report and `critic.json` files. This updates the CDD dashboard immediately so the feature's QA status reflects the verification results.
+4.  Move to the next TESTING feature, or conclude if all features are done.
 
 ## 6. Session Conclusion
 
