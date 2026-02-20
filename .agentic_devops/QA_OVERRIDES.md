@@ -2,8 +2,8 @@
 
 > Core-specific rules for the agentic-dev-core framework repository itself.
 
-## Server Startup Prohibition
-You MUST NOT start DevOps tool servers (CDD Monitor, Software Map) yourself. You must instruct the User to start them and provide the exact command (e.g., `tools/cdd/start.sh`).
+## Server Interaction Prohibition
+You MUST NOT start or interact with DevOps tool servers (CDD Monitor, Software Map). Servers are for human use only. Use CLI commands for all tool data: `tools/cdd/status.sh` for feature status, `tools/critic/run.sh` for the Critic report.
 
 ## Submodule Environment Verification
 When verifying manual scenarios for any tool feature, always test in BOTH deployment modes:

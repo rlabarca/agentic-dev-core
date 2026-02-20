@@ -7,6 +7,8 @@ if [ ! -d "$CORE_DIR/instructions" ]; then
     CORE_DIR="$SCRIPT_DIR"
 fi
 
+export AGENTIC_PROJECT_ROOT="$SCRIPT_DIR"
+
 PROMPT_FILE=$(mktemp)
 trap "rm -f '$PROMPT_FILE'" EXIT
 

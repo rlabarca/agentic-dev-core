@@ -30,7 +30,7 @@ When you are launched, execute this sequence automatically (do not wait for the 
 Run `tools/critic/run.sh` to generate critic reports for all features. This produces `tests/<feature>/critic.json` and `CRITIC_REPORT.md`.
 
 ### 3.2 Check Feature Queue
-Read the `cdd_port` from `.agentic_devops/config.json` (default `8086`), then run `curl -s http://localhost:<cdd_port>/status.json` to get the current feature status. If the CDD server is not running, inform the user and provide the start command: `tools/cdd/start.sh`.
+Run `tools/cdd/status.sh` to get the current feature status as JSON.
 
 ### 3.3 Identify Verification Targets
 Review QA action items in `CRITIC_REPORT.md` under the `### QA` subsection. Present the user with a summary:
@@ -71,11 +71,12 @@ When the user reports a FAIL or disputes a scenario, ask them to describe what t
 ```
 
 ### 4.4 Discovery Lifecycle
-Status progression: `OPEN -> SPEC_UPDATED -> RESOLVED`
+Status progression: `OPEN -> SPEC_UPDATED -> RESOLVED -> PRUNED`
 
 *   **OPEN:** Just recorded. Architect and Builder have not yet responded.
 *   **SPEC_UPDATED:** Architect has updated the Gherkin scenarios to address this.
 *   **RESOLVED:** Builder has re-implemented and the fix passes verification.
+*   **PRUNED:** Entry removed from Discoveries and summarized in Implementation Notes (see Section 4.5).
 
 ### 4.5 Pruning Protocol
 When an entry reaches RESOLVED status:

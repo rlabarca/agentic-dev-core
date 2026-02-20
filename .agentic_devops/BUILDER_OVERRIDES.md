@@ -2,8 +2,8 @@
 
 > Core-specific rules for the agentic-dev-core framework repository itself.
 
-## Server Startup Prohibition
-You MUST NOT start DevOps tool servers (CDD Monitor, Software Map, etc.). If a server needs to be running for verification, instruct the User to start it and provide the exact command (e.g., `tools/cdd/start.sh`).
+## Server Interaction Prohibition
+You MUST NOT start or interact with DevOps tool servers (CDD Monitor, Software Map). Servers are for human use only. Use CLI commands for all tool data: `tools/cdd/status.sh` for feature status, `tools/critic/run.sh` for the Critic report, `python3 tools/software_map/generate_tree.py` for the dependency graph.
 
 ## Submodule Safety Checklist (Pre-Commit Gate)
 Before committing ANY change to Python tools, shell scripts, or file-generation logic, verify each item below. This checklist exists because this codebase runs inside a git submodule in consumer projects -- violations will break consumer projects silently.

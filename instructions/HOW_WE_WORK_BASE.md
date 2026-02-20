@@ -11,12 +11,12 @@ The single source of truth for any project using this framework is not the code,
 
 ### The Architect Agent
 *   **Focus:** "The What and The Why".
-*   **Ownership:** Architectural Policies, Feature Specifications, instruction overrides.
+*   **Ownership:** Architectural Policies, Feature Specifications, instruction overrides, and DevOps process scripts (launcher scripts, shell wrappers, bootstrap tooling).
 *   **Key Duty:** Designing rigorous, unambiguous specifications and enforcing architectural invariants.
 
 ### The Builder Agent
 *   **Focus:** "The How".
-*   **Ownership:** Implementation code, tests, and the DevOps tools.
+*   **Ownership:** Implementation code, tests, and DevOps tool implementation (Python logic, test suites).
 *   **Key Duty:** Translating specifications into high-quality, verified code and documenting implementation discoveries.
 
 ### The QA Agent
@@ -73,14 +73,14 @@ When used as a git submodule (e.g., at `agentic-dev/`):
 1. The submodule provides the base layer (`agentic-dev/instructions/`) and all tools (`agentic-dev/tools/`).
 2. The consumer project runs `agentic-dev/tools/bootstrap.sh` to initialize `.agentic_devops/` with override templates.
 3. Tools resolve their paths via `tools_root` in `.agentic_devops/config.json`.
-4. Upstream updates are pulled via `git submodule update` and audited with `agentic-dev/tools/sync_upstream.sh`.
+4. Upstream updates are pulled via `cd agentic-dev && git pull origin main && cd ..` and audited with `agentic-dev/tools/sync_upstream.sh`.
 
 ### Path Resolution Conventions
 In a submodule setup, the project tree contains two `features/` directories and two `tools/` directories. The following conventions prevent ambiguity:
 
 *   **`features/` directory:** Always refers to `<project_root>/features/` -- the **consumer project's** feature specs. In a submodule setup, this is NOT the framework submodule's own `features/` directory. The framework's features are internal to the submodule and are not scanned by consumer project tools.
 *   **`tools/` references:** All `tools/` references in instruction files are shorthand that resolves against the `tools_root` value from `.agentic_devops/config.json`. In standalone mode, `tools_root` is `"tools"`. In submodule mode, `tools_root` is `"<submodule>/tools"` (e.g., `"agentic-dev/tools"`). Agents MUST read `tools_root` from config before constructing tool paths -- do NOT assume `tools/` is a direct child of the project root.
-*   **`AGENTIC_PROJECT_ROOT`:** The generated launcher scripts export this environment variable as the authoritative project root. All Python and shell tools check this variable first, falling back to directory-climbing detection only when it is not set.
+*   **`AGENTIC_PROJECT_ROOT`:** All launcher scripts (both standalone and bootstrap-generated) export this environment variable as the authoritative project root. All Python and shell tools check this variable first, falling back to directory-climbing detection only when it is not set.
 
 ## 7. User Testing Protocol
 
@@ -107,10 +107,15 @@ Status progression: `OPEN -> SPEC_UPDATED -> RESOLVED -> PRUNED`
 *   An empty `## User Testing Discoveries` section (or its absence) means the feature is clean.
 
 ### 7.5 Feedback Routing
+
+**QA-to-Architect/Builder (from User Testing Discoveries):**
 *   **BUG** -> Builder must fix implementation.
 *   **DISCOVERY** -> Architect must add missing scenarios, then Builder re-implements.
 *   **INTENT_DRIFT** -> Architect must refine scenario intent, then Builder re-implements.
 *   **SPEC_DISPUTE** -> Architect must review the disputed scenario with the user and revise or reaffirm it. The scenario is **suspended** (QA skips it) until the Architect resolves the dispute.
+
+**Builder-to-Architect (from Implementation):**
+*   **INFEASIBLE** -> The feature cannot be implemented as specified (technical constraints, contradictory requirements, or dependency issues). Builder halts work on the feature, records a detailed rationale in Implementation Notes, and skips to the next feature. Architect must revise the spec before the Builder can resume.
 
 ## 8. Critic-Driven Coordination
 The Critic is the project coordination engine. It validates quality AND generates role-specific action items. Every agent runs the Critic at session start.
@@ -119,3 +124,4 @@ The Critic is the project coordination engine. It validates quality AND generate
 *   **Critic** shows what SHOULD BE DONE (role-specific action items).
 *   Agents consult `CRITIC_REPORT.md` for their role-specific priorities before starting work.
 *   CDD does NOT run the Critic. CDD reads pre-computed `role_status` from on-disk `critic.json` files to display role-based columns on the dashboard and in the `/status.json` API.
+*   **Agent Interface:** Agents access tool data via CLI commands (`tools/cdd/status.sh`, `tools/critic/run.sh`, `tools/software_map/generate_tree.py`), never via HTTP servers. The web servers (CDD dashboard, Software Map viewer) are for human use only. This ensures agents can always access current data without depending on server state.

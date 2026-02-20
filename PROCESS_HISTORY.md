@@ -2,6 +2,58 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-20] Documentation Drift: Submodule Update + README Directory (D11, D12, D13)
+- **D11 (submodule update):** HOW_WE_WORK_BASE Section 6 said upstream updates are pulled via `git submodule update`, which pins to the parent's recorded commit (doesn't fetch latest). Updated to `cd agentic-dev && git pull origin main && cd ..` to match the README's correct workflow.
+- **D12-D13 (README directory):** `PROCESS_HISTORY.md` was missing from the README's Directory Structure section despite being a root-level workflow artifact created by bootstrap. Added it.
+- **Files Modified:** `instructions/HOW_WE_WORK_BASE.md` (Section 6), `README.md` (Directory Structure).
+- **Impact:** No spec changes. Documentation corrections only.
+
+## [2026-02-20] Documentation Drift: README Evolution Table + Stale Reference Fix (D6, D7, D8)
+- **D6 (README stale):** The Agentic Evolution table in README.md stopped at v3.0.0. Added v3.1.0 row summarizing all post-v3.0.0 changes: Critic coordination engine, CDD role-based columns, escalation protocols, QA completion authority, Builder startup, CLI-first agent interface, submodule safety, and documentation drift corrections.
+- **D7 (stale reference):** ARCHITECT_BASE Section 4.12 referenced `.agentic_devops/HOW_WE_WORK.md` which was deleted in v2.0.0. Updated to reference `instructions/HOW_WE_WORK_BASE.md` and override equivalents in `.agentic_devops/`.
+- **D8 (terminology):** The v3.0.0 row in the Evolution table used the pre-rename "Critic Quality Gate" terminology. This is historically accurate for that version. The new v3.1.0 row uses the current "Critic Coordination Engine" name, making the rename visible in the table progression.
+- **Files Modified:** `README.md` (Agentic Evolution table), `instructions/ARCHITECT_BASE.md` (Section 4.12).
+- **Impact:** No spec changes. Documentation corrections only.
+
+## [2026-02-20] Documentation Drift: Discovery Lifecycle Alignment (D5)
+- **Problem:** HOW_WE_WORK_BASE Section 7.3 defined the discovery lifecycle as `OPEN -> SPEC_UPDATED -> RESOLVED -> PRUNED`, but QA_BASE Section 4.4 omitted the PRUNED state: `OPEN -> SPEC_UPDATED -> RESOLVED`. The Pruning Protocol was described separately in QA_BASE Section 4.5, so behavior was correct, but the lifecycle summary was inconsistent. An agent reading only the summary line would miss the PRUNED state.
+- **Solution:** Added PRUNED to QA_BASE Section 4.4 lifecycle progression and added a PRUNED bullet with a cross-reference to Section 4.5.
+- **Files Modified:** `instructions/QA_BASE.md` (Section 4.4).
+- **Impact:** No spec changes. Documentation alignment only.
+
+## [2026-02-20] Architectural Decision: Servers for Humans, CLI for Agents (D4)
+- **Problem:** All three agent instruction files required agents to read `cdd_port` from config and run `curl -s http://localhost:<port>/status.json` to get feature status. This created a dependency on a running CDD server. Agents had inconsistent fallback behavior when the server was down: the Architect started it directly, the Builder ignored it, and the QA Agent delegated to the user. The core repo's Builder/QA overrides prohibited server startup, but the Architect had no such restriction.
+- **Architectural Decision:** Servers (CDD dashboard, Software Map viewer) are for human use only. Agents access all tool data via CLI commands that share logic with the server but produce machine-readable output to stdout without requiring a running server.
+- **Solution:**
+    - Replaced all 6 `curl` references across ARCHITECT_BASE (3), BUILDER_BASE (2), and QA_BASE (1) with `tools/cdd/status.sh` CLI command.
+    - Removed all `cdd_port` reading, server-not-responding fallbacks, and server startup instructions from agent protocols.
+    - Added "Agent Interface" principle to HOW_WE_WORK_BASE Section 8: agents use CLI commands, never HTTP servers.
+    - Updated core overrides: "Server Startup Prohibition" broadened to "Server Interaction Prohibition" in both BUILDER_OVERRIDES.md and QA_OVERRIDES.md.
+- **Files Modified:** `instructions/HOW_WE_WORK_BASE.md` (Section 8), `instructions/ARCHITECT_BASE.md` (Sections 4, 5, 8), `instructions/BUILDER_BASE.md` (Sections 2, 4), `instructions/QA_BASE.md` (Section 3), `.agentic_devops/BUILDER_OVERRIDES.md`, `.agentic_devops/QA_OVERRIDES.md`.
+- **Impact:** The CDD feature spec (`features/cdd_status_monitor.md`) needs to be updated to define `tools/cdd/status.sh` as a CLI entry point that shares logic with the web server. Builder must implement `tools/cdd/status.sh`. This also resolves D9 (port default mismatch in agent instructions) as a side effect -- agents no longer reference ports at all.
+
+## [2026-02-20] Documentation Drift: INFEASIBLE Escalation in Shared Philosophy (D3)
+- **Problem:** HOW_WE_WORK_BASE Section 7.5 (Feedback Routing) documented all QA-to-Architect/Builder escalation paths (BUG, DISCOVERY, INTENT_DRIFT, SPEC_DISPUTE) but omitted the Builder-to-Architect `[INFEASIBLE]` escalation. This protocol was documented in BUILDER_BASE Section 4 Step 2b and arch_critic_policy.md Section 2.3, but a Builder reading only the shared philosophy document would not know it exists.
+- **Solution:** Added INFEASIBLE to Section 7.5 (Feedback Routing) as a Builder-to-Architect escalation, organized under a separate subheading from the QA-originated routes. Includes the halt-and-skip behavior and Architect revision requirement.
+- **Files Modified:** `instructions/HOW_WE_WORK_BASE.md` (Section 7.5).
+- **Impact:** No spec changes. Documentation gap filled.
+
+## [2026-02-20] Documentation Drift: AGENTIC_PROJECT_ROOT in Standalone Launchers (D2)
+- **Problem:** HOW_WE_WORK_BASE Section 6 stated "The generated launcher scripts export `AGENTIC_PROJECT_ROOT`" without qualifying that this only applied to bootstrap-generated launchers. The standalone launchers (`run_claude_architect.sh`, `run_claude_builder.sh`, `run_claude_qa.sh`) did not export the variable. Agents reading the shared philosophy document in standalone mode would expect the variable to exist, but it was absent.
+- **Solution:** Two-pronged fix:
+    - Added `export AGENTIC_PROJECT_ROOT="$SCRIPT_DIR"` to all three standalone launcher scripts after the `CORE_DIR` fallback block.
+    - Updated HOW_WE_WORK_BASE Section 6 (Path Resolution Conventions) to say "All launcher scripts (both standalone and bootstrap-generated)" instead of "The generated launcher scripts."
+- **Files Modified:** `run_claude_architect.sh`, `run_claude_builder.sh`, `run_claude_qa.sh`, `instructions/HOW_WE_WORK_BASE.md` (Section 6).
+- **Impact:** Standalone launchers now export the variable consistently. No spec changes.
+
+## [2026-02-20] Documentation Drift: DevOps Tools Ownership Clarification (D1)
+- **Problem:** HOW_WE_WORK_BASE assigned "DevOps tools" ownership to the Builder, while ARCHITECT_BASE gave the Architect an exception to write "DevOps and Process scripts (e.g., tools/, build configurations)." Both agents write to `tools/` in practice -- the Architect writes process infrastructure (launcher scripts, shell wrappers, bootstrap tooling) and the Builder writes tool implementation code (Python logic, test suites). The ownership boundary was undefined.
+- **Solution:** Made the boundary explicit in both documents:
+    - HOW_WE_WORK_BASE Section 2: Architect ownership now includes "DevOps process scripts (launcher scripts, shell wrappers, bootstrap tooling)." Builder ownership changed from "the DevOps tools" to "DevOps tool implementation (Python logic, test suites)."
+    - ARCHITECT_BASE Section 2: Exception narrowed from "DevOps and Process scripts (e.g., tools/, build configurations)" to "DevOps process scripts (e.g., launcher scripts, shell wrappers, bootstrap tooling)" with explicit exclusion of tool implementation code.
+- **Files Modified:** `instructions/HOW_WE_WORK_BASE.md` (Section 2), `instructions/ARCHITECT_BASE.md` (Section 2).
+- **Impact:** No spec changes. Documentation clarification only.
+
 ## [2026-02-20] Submodule Compatibility: Safety Requirements and Agent Guardrails
 - **Problem:** Seven issues identified that would break agentic-dev-core when used as a git submodule in consumer projects. Root causes: (1) bootstrap.sh `sed` regex strips trailing commas from JSON, corrupting config.json; (2) Python tools' directory-climbing finds the submodule's own `.agentic_devops/` before the consumer project's config; (3) generated artifacts (logs, PIDs, caches) written inside `tools/`, dirtying the submodule git state; (4) no `try/except` on `json.load()` in any Python tool; (5) ambiguous `tools/` and `features/` path references in instructions; (6) `cleanup_orphaned_features.py` uses hardcoded CWD-relative paths.
 - **Solution (Spec Changes -- `features/submodule_bootstrap.md`):**

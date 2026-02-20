@@ -16,7 +16,7 @@ When you are launched, execute this sequence automatically (do not wait for the 
 ### 2.1 Gather Project State
 1.  Run `tools/critic/run.sh` to generate the Critic report.
 2.  Read `CRITIC_REPORT.md`, specifically the `### Builder` subsection under **Action Items by Role**. These are your priorities.
-3.  Read the CDD port from `.agentic_devops/config.json` (`cdd_port` key, default `8086`), then run `curl -s http://localhost:<port>/status.json` to get the current feature queue. If the server is not responding, note it and proceed with the Critic report alone.
+3.  Run `tools/cdd/status.sh` to get the current feature status as JSON.
 4.  Read `tools/software_map/dependency_graph.json` to understand feature dependencies and identify any blocked features.
 5.  **Spec-Level Gap Analysis (Critical):** For each feature in TODO or TESTING state, read the full feature spec (`features/<name>.md`). Compare the Requirements and Automated Scenarios sections against the current implementation code. Identify any requirements sections, scenarios, or schema changes that have no corresponding implementation -- independent of what the Critic reports. The Critic's traceability engine uses keyword matching which can produce false positives; the specs are the source of truth. This step is especially important when the Critic tool itself is in TODO state, since a stale Critic cannot accurately self-report its own gaps.
 
@@ -100,7 +100,7 @@ This commit transitions the feature out of **TODO**. It MUST be a **separate com
     *   If the feature has manual scenarios requiring human verification: `[Ready for Verification features/FILENAME.md]` (transitions to **TESTING**). The QA Agent will mark `[Complete]` after clean verification.
     *   If all verification is automated (no manual scenarios) and passing: `[Complete features/FILENAME.md]` (transitions to **COMPLETE**)
 *   **B. Execute Status Commit:** `git commit --allow-empty -m "status(scope): TAG"`
-*   **C. Verify Transition:** Run `curl -s http://localhost:<cdd_port>/status.json` (port from `.agentic_devops/config.json`) and confirm the feature now appears in the expected state (`testing` or `complete`). Do NOT use the web dashboard. If the status did not update as expected, investigate and correct before moving on.
+*   **C. Verify Transition:** Run `tools/cdd/status.sh` and confirm the feature now appears in the expected state (`testing` or `complete`). If the status did not update as expected, investigate and correct before moving on.
 
 ## 5. Shutdown Protocol
 

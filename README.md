@@ -109,6 +109,7 @@ The sync script shows a changelog of what changed in `instructions/` and `tools/
 *   `agentic_devops.sample/` -- Override templates for new consumer projects.
 *   `features/` -- Meta-specifications for the framework's own tools.
 *   `tools/` -- Python-based DevOps tools (CDD Monitor, Software Map, Critic, Bootstrap, Upstream Sync).
+*   `PROCESS_HISTORY.md` -- Changelog tracking Agentic Workflow and DevOps tool evolution.
 
 ## Port Allocation
 
@@ -172,6 +173,7 @@ flowchart TD
 
 | Version | Milestone | Workflow Changes |
 | :--- | :--- | :--- |
+| v3.1.0 | Critic Coordination Engine + CLI-First Agents | Critic redesigned from quality gate to coordination engine with role-specific action items and role_status computation; CDD redesigned with Architect/Builder/QA columns; SPEC_DISPUTE and INFEASIBLE escalation protocols; QA completion authority for manually-verified features; Builder self-directing startup protocol; CLI-first agent interface (servers for humans only); submodule compatibility safety requirements; documentation drift audit and corrections. |
 | v3.0.0 | Critic Quality Gate + QA Persona | Dual-gate validation (Spec Gate + Implementation Gate); Critic tool with traceability engine, policy adherence scanner, and optional LLM logic drift; QA Agent role with structured discovery protocol; Builder Decision Protocol with structured tags. |
 | v2.0.0 | Submodule-Ready Layered Architecture | Split instructions into base+override layers; submodule consumption model with bootstrap and sync tools; port isolation (9086/9087 core, 8086/8087 consumer). |
 | v1.0.1 | Port Isolation & Spec Refinement | Configurable ports for tool isolation; Meta-mode support; Refined instruction specs. |
