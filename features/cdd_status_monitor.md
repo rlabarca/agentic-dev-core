@@ -12,6 +12,7 @@ The Continuous Design-Driven (CDD) Monitor tracks the status of all feature file
 ### 2.1 Feature Scanning
 *   **Path Awareness:** The monitor must scan the project's `features/` directory for all feature files.
 *   **Status Detection:** Status is derived from a combination of file modification timestamps (for [TODO] detection) and source control history/tags.
+*   **Discovery-Aware Lifecycle Preservation:** When a feature file is modified after a status commit, the monitor MUST check whether the modification is limited to the `## User Testing Discoveries` section. If the spec content above that section is identical to the content at the status commit, the lifecycle state is preserved (COMPLETE or TESTING). This prevents QA housekeeping (pruning resolved discoveries) from triggering a false lifecycle reset to TODO.
 
 ### 2.2 UI & Layout
 *   **Role-Based Columns:** The dashboard MUST render features in a table with the following columns:
@@ -118,6 +119,21 @@ These scenarios are validated by the Builder's automated test suite.
     And no todo, testing, or complete sub-arrays exist
     And no top-level test_status field exists
 
+#### Scenario: Lifecycle Preserved When Only Discoveries Section Changes
+    Given a feature is in COMPLETE lifecycle state with a status commit
+    And the feature file is modified after the status commit
+    And the modification is limited to the User Testing Discoveries section
+    When the monitor computes feature status
+    Then the feature remains in COMPLETE lifecycle state
+    And the feature is NOT reset to TODO
+
+#### Scenario: Lifecycle Reset When Spec Content Changes
+    Given a feature is in COMPLETE lifecycle state with a status commit
+    And the feature file is modified after the status commit
+    And the modification includes changes above the User Testing Discoveries section
+    When the monitor computes feature status
+    Then the feature is reset to TODO lifecycle state
+
 #### Scenario: Internal Feature Status File Preserved
     Given the CDD server is running
     When any request is made to the server
@@ -160,7 +176,7 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
 *   **Test Isolation:** The test aggregator scans `tests/<feature_name>/tests.json` (resolved relative to `PROJECT_ROOT`) and treats malformed JSON as FAIL.
 *   **Name Convention:** Feature-to-test mapping uses the feature file's stem: `features/<name>.md` maps to `tests/<name>/tests.json`. The `<name>` must match exactly (case-sensitive).
 *   **Server-Side Rendering:** The HTML is generated dynamically per request (no static `index.html`). Auto-refreshes every 5 seconds via `<meta http-equiv="refresh">`.
-*   **Status Logic:** `COMPLETE` requires `complete_ts > test_ts` AND `file_mod_ts <= complete_ts`. Any file edit after the completion commit resets status to `TODO` (the "Status Reset" protocol).
+*   **Status Logic:** `COMPLETE` requires `complete_ts > test_ts` AND either `file_mod_ts <= complete_ts` OR the only changes since the status commit are in the `## User Testing Discoveries` section (discovery-aware lifecycle preservation). To check: retrieve the file content at the status commit hash via `git show <hash>:<path>`, strip the `## User Testing Discoveries` section and everything below from both versions, and compare. If the spec content above discoveries is identical, preserve the lifecycle state. Otherwise reset to `TODO`.
 *   **Escape Sequences:** Git grep patterns use `\\[` / `\\]` in f-strings to avoid Python 3.12+ deprecation warnings for invalid escape sequences.
 *   **Agent Interface:** The `/status.json` API endpoint is the primary machine-readable contract. All agent tooling (Status Management, Context Clear Protocol, Release Protocol Zero-Queue checks) MUST use `curl http://localhost:<cdd_port>/status.json`. The disk file `feature_status.json` is a secondary artifact. Agents MUST read the port from `.agentic_devops/config.json` (`cdd_port` key, default `8086`) and MUST NOT hardcode or guess port numbers.
 *   **Path Normalization:** `os.path.relpath` may resolve to `.`, making `features_rel` = `./features`. The `f_path` used for git grep MUST be normalized with `os.path.normpath()` to strip the `./` prefix, otherwise status commit patterns like `[Complete features/file.md]` won't match `./features/file.md`.
