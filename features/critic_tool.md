@@ -5,7 +5,7 @@
 > Prerequisite: features/arch_critic_policy.md
 
 ## 1. Overview
-The Critic tool is the automated enforcement engine for the Critic Quality Gate policy. It performs dual-gate validation (Spec Gate + Implementation Gate) on feature files, produces per-feature audit reports, and generates an aggregate `CRITIC_REPORT.md`.
+The Critic tool is the project coordination engine. It performs dual-gate validation (Spec Gate + Implementation Gate) on feature files, audits user testing status, generates role-specific action items for each agent, and produces per-feature reports and an aggregate `CRITIC_REPORT.md`. Every agent runs the Critic at session start to determine their priorities.
 
 ## 2. Requirements
 
@@ -37,10 +37,11 @@ The Implementation Gate validates that the implementation aligns with the specif
 
 ### 2.3 Traceability Engine
 *   **Keyword Extraction:** Extract keywords from automated scenario titles by stripping articles (a, an, the), prepositions (in, on, at, to, for, of, by, with, from, via), and conjunctions (and, or, but).
-*   **Matching Algorithm:** For each automated scenario, search test function names and test function bodies for matching keywords. A match requires 2 or more keywords present in the test.
+*   **Matching Algorithm:** For each automated scenario, search test entries (function names + bodies for Python, scenario markers + surrounding context for Bash) for matching keywords. A match requires 2 or more keywords present in the test entry.
 *   **Manual Scenario Handling:** Manual scenarios are EXEMPT from traceability. If a manual scenario has matching automated tests, flag it as informational (not a failure).
 *   **Traceability Overrides:** Feature files MAY include explicit `traceability_overrides` mappings in their Implementation Notes section to handle cases where keyword matching is insufficient. Format: `- traceability_override: "Scenario Title" -> test_function_name`.
-*   **Test Discovery:** Tests are located at `tests/<feature_name>/` and within the tool directory specified by `tools_root` in config.
+*   **Test Discovery:** Tests are located at `tests/<feature_name>/` and within the tool directory specified by `tools_root` in config. The engine discovers both `test_*.py` (Python) and `test_*.sh` (Bash) test files.
+*   **Bash Test File Support:** Bash test files (`test_*.sh`) use `[Scenario]` markers to delineate test entries. The engine parses lines matching `echo "[Scenario] <title>"` as scenario entry points. Each `[Scenario]` marker and its surrounding context (up to the next marker or end of file) form a test entry for keyword matching.
 
 ### 2.4 Logic Drift Engine (LLM-Based)
 *   **Input:** Gherkin scenario text + mapped test function body (from traceability).
@@ -90,6 +91,11 @@ For each feature file, produce `tests/<feature_name>/critic.json`:
         "bugs": 0,
         "discoveries": 0,
         "intent_drifts": 0
+    },
+    "action_items": {
+        "architect": [{"priority": "HIGH | MEDIUM | LOW", "category": "<source_category>", "feature": "<feature_name>", "description": "<imperative action>"}],
+        "builder": [],
+        "qa": []
     }
 }
 ```
@@ -97,16 +103,39 @@ For each feature file, produce `tests/<feature_name>/critic.json`:
 ### 2.8 Aggregate Report
 The tool MUST generate `CRITIC_REPORT.md` at the project root containing:
 *   Summary table: feature name, spec gate status, implementation gate status, user testing status.
+*   **Action Items by Role:** A section with `### Architect`, `### Builder`, `### QA` subsections. Each subsection lists action items sorted by priority (HIGH first), aggregated across all features. This is the primary coordination output.
 *   Builder decision audit: all AUTONOMOUS/DEVIATION/DISCOVERY entries across features.
 *   Policy violations: all FORBIDDEN pattern matches.
 *   Traceability gaps: scenarios without matching tests.
 *   Open user testing items: all OPEN discoveries across features.
 
-### 2.9 CDD Integration
-*   **CDD Reads Critic Output:** The CDD Monitor reads `tests/<feature_name>/critic.json` alongside `tests/<feature_name>/tests.json`.
-*   **New Fields in Status JSON:** Per-feature entries gain a `critic_status` field (`PASS`, `WARN`, `FAIL`, or omitted if no `critic.json` exists). The top-level status JSON gains a `critic_status` field aggregating all per-feature critic statuses (same aggregation logic as `test_status`).
-*   **Dashboard Badge:** The web dashboard displays a `[CRITIC: PASS|WARN]` badge per feature.
-*   **Optional Blocking:** When `critic_gate_blocking` is `true` in config, a feature with `critic_status: FAIL` cannot transition to COMPLETE via the normal status tag protocol. The CDD server enforces this by rejecting the transition (feature remains in its current state).
+### 2.9 CDD Integration (Decoupled)
+The Critic is agent-facing; CDD is human-facing. CDD does NOT run the Critic.
+
+*   **QA Status Only:** CDD MAY read the `user_testing.status` field from on-disk `tests/<feature_name>/critic.json` files to display a QA column on the dashboard. CDD does NOT read or display spec_gate or implementation_gate status.
+*   **No Blocking:** The `critic_gate_blocking` config key is deprecated (no-op). CDD does not gate status transitions based on Critic results.
+*   **No critic_status in Status JSON:** The CDD `/status.json` endpoint does NOT include `critic_status` fields (neither top-level nor per-feature). Per-feature entries MAY include a `qa_status` field (`CLEAN` or `HAS_OPEN_ITEMS`) when a `critic.json` file exists on disk.
+
+### 2.10 Role-Specific Action Item Generation
+The Critic MUST generate imperative action items for each role based on the analysis results. Action items are derived as follows:
+
+| Role | Source | Example Item |
+|------|--------|-------------|
+| **Architect** | Spec Gate FAIL (missing sections, broken prereqs) | "Fix spec gap: section_completeness -- missing Requirements" |
+| **Architect** | OPEN DISCOVERY/INTENT_DRIFT in User Testing | "Update spec for cdd_status_monitor: [discovery title]" |
+| **Architect** | Spec Gate WARN (no manual scenarios, empty impl notes) | "Improve spec: scenario_classification -- only Automated" |
+| **Builder** | Structural completeness FAIL (missing/failing tests) | "Fix failing tests for submodule_bootstrap" |
+| **Builder** | Traceability gaps (unmatched scenarios) | "Write tests for: Zero-Queue Verification" |
+| **Builder** | OPEN BUGs in User Testing | "Fix bug in critic_tool: [bug title]" |
+| **QA** | Features in TESTING status (from CDD feature_status.json) | "Verify cdd_status_monitor: 3 manual scenarios" |
+| **QA** | SPEC_UPDATED discoveries | "Re-verify critic_tool: [item title]" |
+
+**Priority Levels:**
+*   **HIGH** -- Gate FAIL, OPEN BUGs, unacknowledged DEVIATIONs/DISCOVERYs.
+*   **MEDIUM** -- Traceability gaps, SPEC_UPDATED items awaiting re-verification.
+*   **LOW** -- Gate WARNs, informational items.
+
+**CDD Feature Status Dependency:** QA action items that depend on CDD feature status (TESTING state) require `tools/cdd/feature_status.json` to exist on disk. If unavailable, the Critic skips status-dependent QA items with a note in the report.
 
 ## 3. Scenarios
 
@@ -193,10 +222,46 @@ The tool MUST generate `CRITIC_REPORT.md` at the project root containing:
     Then logic_drift is skipped with a WARN note
     And the overall implementation_gate status is not affected by the skip
 
-#### Scenario: CDD Reads Critic Status
-    Given tests/<feature_name>/critic.json exists with spec_gate.status PASS
-    When the CDD server processes status for that feature
-    Then the feature entry includes critic_status PASS
+#### Scenario: Bash Test File Discovery
+    Given a feature has test files at tests/<feature_name>/
+    And both test_feature.py and test_feature.sh exist
+    When the Critic tool discovers test files
+    Then both Python and Bash test files are included in the test file list
+
+#### Scenario: Bash Scenario Keyword Matching
+    Given a Bash test file contains echo "[Scenario] Bootstrap Consumer Project"
+    And a feature has an automated scenario titled "Bootstrap Consumer Project Setup"
+    When the Critic tool runs the traceability check
+    Then the scenario is matched to the Bash test entry via keyword matching
+
+#### Scenario: Architect Action Items from Spec Gaps
+    Given a feature has spec_gate.status FAIL due to missing Requirements section
+    When the Critic tool generates action items
+    Then an Architect action item is created with priority HIGH
+    And the description identifies the specific spec gap
+
+#### Scenario: Builder Action Items from Traceability Gaps
+    Given a feature has an automated scenario with no matching test
+    When the Critic tool generates action items
+    Then a Builder action item is created with priority MEDIUM
+    And the description identifies the unmatched scenario title
+
+#### Scenario: QA Action Items from TESTING Status
+    Given a feature is in TESTING state per CDD feature_status.json
+    And the feature has 3 manual scenarios
+    When the Critic tool generates action items
+    Then a QA action item is created identifying the feature and scenario count
+
+#### Scenario: Action Items in Critic JSON Output
+    Given the Critic tool completes analysis of a feature with spec gaps and traceability gaps
+    When the per-feature critic.json is written
+    Then it contains an action_items object with architect, builder, and qa arrays
+
+#### Scenario: Action Items in Aggregate Report
+    Given the Critic tool has run on multiple features with various gaps
+    When CRITIC_REPORT.md is generated
+    Then it contains an "Action Items by Role" section
+    And each role subsection lists items sorted by priority
 
 #### Scenario: Spec Gate Policy File Reduced Evaluation
     Given a feature file is an architectural policy (arch_*.md)
@@ -212,11 +277,12 @@ The tool MUST generate `CRITIC_REPORT.md` at the project root containing:
 
 ### Manual Scenarios (Human Verification Required)
 
-#### Scenario: CDD Dashboard Critic Badge
+#### Scenario: CDD Dashboard QA Column
     Given the CDD server is running
     And critic.json files exist for features
     When the User opens the web dashboard
-    Then each feature entry shows a CRITIC badge with PASS or WARN
+    Then each feature entry shows a QA column with CLEAN or HAS_OPEN_ITEMS
+    And features without critic.json show a blank QA cell
 
 #### Scenario: Critic Report Readability
     Given CRITIC_REPORT.md has been generated

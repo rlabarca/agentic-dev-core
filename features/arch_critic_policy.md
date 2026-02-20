@@ -1,10 +1,10 @@
-# Architectural Policy: Critic Quality Gate
+# Architectural Policy: Critic Coordination Engine
 
-> Label: "Policy: Critic Quality Gate"
+> Label: "Policy: Critic Coordination Engine"
 > Category: "Quality Assurance"
 
 ## 1. Purpose
-This policy defines the invariants and constraints governing the Critic Quality Gate system -- the automated and semi-automated verification layer that ensures specification-implementation alignment across the framework.
+This policy defines the invariants and constraints governing the Critic -- the project coordination engine that validates specification-implementation quality AND generates role-specific action items for each agent. The Critic is the single source of truth for what each agent should work on next.
 
 ## 2. Invariants
 
@@ -33,7 +33,7 @@ The Builder MUST classify every non-trivial implementation decision using struct
 | `[DEVIATION]` | HIGH | Intentionally diverged from what the spec says. Requires Architect acknowledgment. |
 | `[DISCOVERY]` | HIGH | Found an unstated requirement during implementation. Requires Architect acknowledgment. |
 
-**Constraint:** A feature with unacknowledged `[DEVIATION]` or `[DISCOVERY]` entries MUST NOT transition to `[Complete]` when `critic_gate_blocking` is enabled.
+**Constraint:** A feature with unacknowledged `[DEVIATION]` or `[DISCOVERY]` entries generates HIGH-priority Builder action items in the Critic report.
 
 ### 2.4 User Testing Feedback Loop
 The QA Agent records findings during manual verification using three discovery types:
@@ -44,13 +44,22 @@ The QA Agent records findings during manual verification using three discovery t
 | `[DISCOVERY]` | Behavior exists but no scenario covers it. |
 | `[INTENT_DRIFT]` | Behavior matches the spec literally but misses the actual intent. |
 
-**Constraint:** Discoveries follow a lifecycle: `OPEN -> SPEC_UPDATED -> RESOLVED -> PRUNED`. A feature with OPEN discoveries MUST NOT transition to `[Complete]` when `critic_gate_blocking` is enabled.
+**Constraint:** Discoveries follow a lifecycle: `OPEN -> SPEC_UPDATED -> RESOLVED -> PRUNED`. OPEN discoveries generate role-specific action items in the Critic report (BUGs route to Builder, DISCOVERYs and INTENT_DRIFTs route to Architect).
 
 ### 2.5 Policy Adherence
 Architectural policy files (`arch_*.md`) MAY define `FORBIDDEN:` patterns -- literal strings or regex patterns that MUST NOT appear in the implementation code of features anchored to that policy.
 
 *   The Critic tool scans implementation files for FORBIDDEN pattern violations.
 *   Any violation produces a FAIL on the Implementation Gate.
+
+### 2.6 Agent Startup Integration
+Every agent (Architect, Builder, QA) MUST run the Critic at session start. The Critic report provides each agent with its role-specific action items, ensuring immediate alignment with project health and priorities.
+
+### 2.7 Role-Specific Action Items
+The Critic MUST generate imperative action items categorized by role (Architect, Builder, QA). Action items are derived from existing analysis gates (spec gate, implementation gate, user testing audit) and are prioritized by severity. Each action item identifies the target feature and the specific gap to address.
+
+### 2.8 CDD Decoupling
+The Critic is an agent-facing coordination tool. CDD is a lightweight state display for human consumption. CDD shows what IS (feature status, test results, QA status). The Critic shows what SHOULD BE DONE (role-specific action items). CDD does NOT run the Critic. CDD MAY read the `user_testing.status` field from on-disk `critic.json` files to display a QA column.
 
 ## 3. Configuration
 
@@ -60,7 +69,7 @@ The following keys in `.agentic_devops/config.json` govern Critic behavior:
 |-----|------|---------|---------|
 | `critic_llm_model` | string | `claude-sonnet-4-20250514` | Model used for logic drift detection. |
 | `critic_llm_enabled` | boolean | `false` | Whether the LLM-based logic drift engine is active. |
-| `critic_gate_blocking` | boolean | `false` | Whether Critic FAIL/WARN blocks status transitions. |
+| `critic_gate_blocking` | boolean | `false` | **Deprecated (no-op).** Retained for backward compatibility. Status transitions are not gated by critic results. |
 
 ## 4. Output Contract
 The Critic tool MUST produce:
@@ -70,5 +79,6 @@ The Critic tool MUST produce:
 
 ## Implementation Notes
 *   This policy governs buildable tooling constraints (the Critic tool itself), not process rules. It is valid under the Feature Scope Restriction mandate.
-*   The `critic_gate_blocking` flag defaults to `false` to allow gradual adoption. Teams can enable it once their specs reach sufficient maturity.
+*   The `critic_gate_blocking` flag is deprecated as a no-op. The coordination engine model replaces blocking gates with advisory action items per role. The config key is retained for backward compatibility with existing `.agentic_devops/config.json` files.
 *   FORBIDDEN patterns are optional. Not all architectural policies need to define them.
+*   The CDD decoupling (Invariant 2.8) means the CDD dashboard no longer shows a "Critic" column. Instead, CDD shows a "QA" column derived from `user_testing.status` in on-disk `critic.json` files.

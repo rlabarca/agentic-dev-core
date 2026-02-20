@@ -17,11 +17,11 @@ The Continuous Design-Driven (CDD) Monitor tracks the status of all feature file
 *   **Table Layout:** Each status section (TODO, TESTING, COMPLETE) MUST render features in a table with the following columns:
     *   **Feature** -- The feature filename.
     *   **Tests** -- The test status badge (PASS, FAIL, or blank if no `tests.json` exists).
-    *   **Critic** -- The critic status badge (PASS, WARN, FAIL, or blank if no `critic.json` exists).
+    *   **QA** -- The QA status badge (CLEAN in green, HAS_OPEN_ITEMS in orange, or blank if no `critic.json` exists).
 *   **Compact Design:** Minimal padding and margins to ensure the dashboard fits in a small window.
 *   **COMPLETE Table Capping:** The "COMPLETE" section should be limited to the most recent items.
 *   **Status Indicators:** Use distinct color coding for TODO, TESTING, and COMPLETE section headers.
-*   **Badge Colors:** PASS = green, WARN = orange, FAIL = red. Blank cells when no data exists (no badge, no "UNKNOWN" text).
+*   **Badge Colors:** PASS/CLEAN = green, WARN/HAS_OPEN_ITEMS = orange, FAIL = red. Blank cells when no data exists (no badge, no "UNKNOWN" text).
 *   **Scope:** The web dashboard is for human consumption only. Agents must use the `/status.json` API endpoint.
 
 ### 2.3 Verification Signals
@@ -52,12 +52,12 @@ The Continuous Design-Driven (CDD) Monitor tracks the status of all feature file
 *   **Deterministic Output:** Arrays MUST be sorted by file path. Keys MUST be sorted.
 *   **Agent Contract:** Agents MUST query status via `curl http://localhost:<port>/status.json` where `<port>` is read from `.agentic_devops/config.json` (`cdd_port`, default `8086`). Agents MUST NOT scrape the web dashboard or guess ports.
 
-### 2.5 Critic Status Integration
-*   **Critic JSON Discovery:** For each feature `features/<name>.md`, the monitor checks for `tests/<name>/critic.json` alongside `tests/<name>/tests.json`.
-*   **Per-Feature Critic Status:** If `critic.json` exists, the feature entry gains a `critic_status` field with the value from the overall gate status (derived from the worse of `spec_gate.status` and `implementation_gate.status`). If no `critic.json` exists, the `critic_status` key is omitted.
-*   **Top-Level Aggregation:** The status JSON gains a top-level `critic_status` field using the same aggregation logic as `test_status`: FAIL if any feature reports FAIL, PASS only if all features with critic files report PASS, UNKNOWN if no critic files exist.
-*   **Dashboard Badge:** Each feature entry on the web dashboard displays a `[CRITIC: PASS|WARN|FAIL]` badge when `critic.json` exists.
-*   **Optional Blocking:** When `critic_gate_blocking` is `true` in `.agentic_devops/config.json`, the CDD monitor prevents a feature with `critic_status: FAIL` from transitioning to COMPLETE. The status tag commit is recognized but the feature remains in its current state.
+### 2.5 QA Status Integration
+*   **Critic JSON Discovery:** For each feature `features/<name>.md`, the monitor checks for `tests/<name>/critic.json` on disk.
+*   **Per-Feature QA Status:** If `critic.json` exists, the monitor reads the `user_testing.status` field and exposes it as `qa_status` on the feature entry (`CLEAN` or `HAS_OPEN_ITEMS`). If no `critic.json` exists, the `qa_status` key is omitted.
+*   **No Top-Level Aggregation:** There is no top-level `critic_status` or `qa_status` field. QA status is per-feature only.
+*   **Dashboard Column:** Each feature entry on the web dashboard displays a QA column showing `CLEAN` (green) or `HAS_OPEN_ITEMS` (orange). Blank when no `critic.json` exists.
+*   **No Blocking:** The `critic_gate_blocking` config key is deprecated (no-op). CDD does not gate status transitions based on critic or QA results.
 
 ## 3. Scenarios
 
@@ -78,18 +78,18 @@ These scenarios are validated by the Builder's automated test suite.
     Then the Architect calls GET /status.json on the configured CDD port
     And verifies that the "todo" and "testing" arrays are empty
 
-#### Scenario: Critic Status in API Response
+#### Scenario: QA Status in API Response
     Given the CDD server is running
-    And tests/<feature_name>/critic.json exists for a feature
+    And tests/<feature_name>/critic.json exists with user_testing.status CLEAN
     When an agent calls GET /status.json
-    Then the feature entry includes a critic_status field
-    And the top-level response includes an aggregated critic_status field
+    Then the feature entry includes a qa_status field with value CLEAN
+    And the top-level response does NOT include a critic_status field
 
-#### Scenario: Critic Status Omitted When No File
+#### Scenario: QA Status Omitted When No Critic File
     Given the CDD server is running
     And no critic.json exists for a feature
     When an agent calls GET /status.json
-    Then the feature entry does not include a critic_status field
+    Then the feature entry does not include a qa_status field
 
 ### Manual Scenarios (Human Verification Required)
 These scenarios MUST NOT be validated through automated tests. The Builder must start the server and instruct the User to verify the web dashboard visually.
@@ -98,8 +98,9 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
     Given the CDD server is running
     When the User opens the web dashboard in a browser
     Then each status section (TODO, TESTING, COMPLETE) displays features in a table
-    And the table has columns for Feature, Tests, and Critic
-    And test/critic badges show PASS/WARN/FAIL with appropriate colors
+    And the table has columns for Feature, Tests, and QA
+    And test badges show PASS/FAIL with appropriate colors
+    And QA badges show CLEAN (green) or HAS_OPEN_ITEMS (orange)
     And cells are blank when no tests.json or critic.json exists for that feature
 
 #### Scenario: Web Dashboard Auto-Refresh
@@ -107,11 +108,12 @@ These scenarios MUST NOT be validated through automated tests. The Builder must 
     When a feature status changes (e.g., a status commit is made)
     Then the dashboard reflects the updated status within 5 seconds
 
-#### Scenario: Critic Badge on Dashboard
+#### Scenario: QA Column on Dashboard
     Given the CDD server is running
     And critic.json files exist for some features
     When the User opens the web dashboard
-    Then each feature with a critic.json shows a CRITIC badge with PASS, WARN, or FAIL
+    Then each feature with a critic.json shows CLEAN or HAS_OPEN_ITEMS in the QA column
+    And features without critic.json show a blank QA cell
 
 ## 4. Implementation Notes
 *   **Test Scope:** Automated tests MUST only cover the `/status.json` API endpoint and the underlying status logic. The web dashboard HTML rendering and visual layout MUST NOT be tested through automated tests. The Builder MUST NOT start the CDD server. After passing automated tests, the Builder should use the `[Ready for Verification]` status tag and instruct the User to start the server (`tools/cdd/start.sh`) and visually verify the dashboard.

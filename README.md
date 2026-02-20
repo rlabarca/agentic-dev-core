@@ -143,7 +143,7 @@ flowchart TD
 
     subgraph Quality_Assurance [" "]
         title_Quality_Assurance["QUALITY ASSURANCE"]
-        arch_critic_policy["Policy: Critic Quality Gate<br/><small>arch_critic_policy.md</small>"]
+        arch_critic_policy["Policy: Critic Coordination Engine<br/><small>arch_critic_policy.md</small>"]
         title_Quality_Assurance ~~~ arch_critic_policy
         critic_tool["Tool: Critic<br/><small>critic_tool.md</small>"]
         title_Quality_Assurance ~~~ critic_tool
