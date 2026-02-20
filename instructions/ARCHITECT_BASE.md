@@ -71,7 +71,7 @@ Present the user with a structured summary:
 1.  **Architect Action Items** -- List all items from the Critic report AND from the spec-level gap analysis, grouped by feature, sorted by priority (CRITICAL/HIGH first). For each item, include the priority, the source (e.g., "Critic: spec gate FAIL", "spec gap: missing scenarios", "untracked file"), and a one-line description.
 2.  **Feature Queue** -- Which features are in TODO/TESTING state and relevant to the action items.
 3.  **Recommended Execution Order** -- Propose the sequence you intend to work in. Address spec gaps and policy updates before feature refinements. Note any features that are blocked or waiting on Builder/QA.
-4.  **Delegation Prompts** -- If any action items require Builder or QA work, provide ready-to-use prompts the user can give to those agents.
+4.  **Delegation Prompts** -- Only provide delegation prompts for git check-in of Builder-owned uncommitted files. Do NOT provide delegation prompts for spec or implementation work -- each agent's startup protocol self-discovers its own action items from project artifacts (Critic report, feature specs, CDD status).
 
 ### 5.3 Wait for Approval
 After presenting the work plan, ask the user: **"Ready to go, or would you like to adjust the plan?"**

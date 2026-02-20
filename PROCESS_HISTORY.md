@@ -2,6 +2,19 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-19] Architect Delegation Prompt Scope Reduction
+- **Problem:** The Architect's work plan included delegation prompts for Builder/QA spec and implementation work. This was redundant -- each agent's startup protocol already self-discovers action items from project artifacts (Critic report, feature specs, CDD status). The delegation prompts added noise and implied the Builder/QA couldn't derive their own priorities.
+- **Solution:** Narrowed Section 5.2 item 4 in `ARCHITECT_BASE.md`. Delegation prompts are now restricted to git check-in of Builder-owned uncommitted files only. Spec and implementation work is NOT delegated -- agents discover it through their startup protocols.
+- **Files Modified:** `instructions/ARCHITECT_BASE.md` (Section 5.2 item 4).
+- **Impact:** No spec changes. Architect startup behavior only.
+
+## [2026-02-19] QA Status: Tighten CLEAN Definition
+- **Problem:** The Critic computed QA=CLEAN for features in TESTING lifecycle state that had no open user testing items. But TESTING means "awaiting QA verification" -- the QA agent hasn't touched the feature yet. This caused the CDD dashboard to show QA=CLEAN while the Critic simultaneously generated "Verify" action items for the same features, a direct contradiction.
+- **Root Cause:** The QA CLEAN definition in Section 2.11 of `critic_tool.md` said "is or was in TESTING/COMPLETE lifecycle state." The TESTING inclusion was too broad -- it marked unverified features as CLEAN.
+- **Solution:** Tightened QA CLEAN to require COMPLETE lifecycle state only. Features in TESTING state now always receive QA=TODO (unless elevated to FAIL/DISPUTED by open items). Added scenario "Role Status QA TODO for TESTING Feature" to enforce the constraint.
+- **Files Modified:** `features/critic_tool.md` (Section 2.11 QA Status definitions, new scenario).
+- **Impact:** Critic spec reset to TODO. Builder must update `compute_role_status()` in `tools/critic/critic.py`.
+
 ## [2026-02-19] Architect Startup Protocol
 - **Problem:** The Architect had a "Context Clear Protocol" that was a recovery checklist, not a proactive startup sequence. Unlike the Builder (which now proposes a work plan on launch), the Architect waited passively for user direction. The Architect also had no spec-level gap analysis and no mechanism to present delegation prompts for Builder/QA work.
 - **Solution:** Restructured Section 5 from "Strategic Protocols > Context Clear Protocol" into a proper "Startup Protocol" (5.1 Gather State, 5.2 Propose Work Plan, 5.3 Wait for Approval), mirroring the Builder's pattern. Added spec-level gap analysis (step 5.1.5) and untracked file triage (step 5.1.6) to the state-gathering phase. Work plan includes delegation prompts for Builder/QA. Added initial prompt to launcher script.
