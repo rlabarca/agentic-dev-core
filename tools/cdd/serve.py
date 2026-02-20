@@ -287,9 +287,9 @@ URGENCY_ORDER = {
 
 
 def _role_badge_html(status):
-    """Returns a colored badge span for a role status, or '--' if None."""
+    """Returns a colored badge span for a role status, or '??' if None."""
     if status is None:
-        return '<span class="st-na">--</span>'
+        return '<span class="st-na">??</span>'
     css = ROLE_BADGE_CSS.get(status, "st-na")
     return f'<span class="{css}">{status}</span>'
 
@@ -380,7 +380,7 @@ body{{
 .hdr h1{{font-size:14px;color:#FFF;font-weight:600}}
 .dim{{color:#666;font-size:0.9em}}
 h2{{font-size:13px;color:#FFF;margin-bottom:6px;border-bottom:1px solid #2A2F36;padding-bottom:4px}}
-h3{{font-size:11px;color:#888;margin:8px 0 2px;text-transform:uppercase;letter-spacing:.5px}}
+h3{{font-size:11px;color:#888;margin:8px 0 2px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #2A2F36;padding-bottom:3px}}
 .features{{background:#1A2028;border-radius:4px;padding:8px 10px;margin-bottom:10px}}
 .ft{{width:100%;border-collapse:collapse}}
 .ft th{{text-align:left;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:2px 6px;border-bottom:1px solid #2A2F36}}
