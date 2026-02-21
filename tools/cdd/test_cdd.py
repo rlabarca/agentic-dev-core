@@ -783,8 +783,8 @@ class TestGetChangeScope(unittest.TestCase):
     @patch('serve.run_command')
     def test_extracts_targeted_scope(self, mock_run):
         def mock_git(cmd):
-            if "Complete" in cmd and "%s" in cmd:
-                return ("[Complete features/test.md] "
+            if "Complete" in cmd:
+                return ("2000000000 [Complete features/test.md] "
                         "[Scope: targeted:Web Dashboard Display]")
             return ""
         mock_run.side_effect = mock_git
@@ -794,8 +794,8 @@ class TestGetChangeScope(unittest.TestCase):
     @patch('serve.run_command')
     def test_extracts_full_scope(self, mock_run):
         def mock_git(cmd):
-            if "Complete" in cmd and "%s" in cmd:
-                return "[Complete features/test.md] [Scope: full]"
+            if "Complete" in cmd:
+                return "2000000000 [Complete features/test.md] [Scope: full]"
             return ""
         mock_run.side_effect = mock_git
         scope = get_change_scope("features/test.md")
@@ -804,8 +804,8 @@ class TestGetChangeScope(unittest.TestCase):
     @patch('serve.run_command')
     def test_returns_none_when_no_scope(self, mock_run):
         def mock_git(cmd):
-            if "Complete" in cmd and "%s" in cmd:
-                return "[Complete features/test.md]"
+            if "Complete" in cmd:
+                return "2000000000 [Complete features/test.md]"
             return ""
         mock_run.side_effect = mock_git
         scope = get_change_scope("features/test.md")
@@ -822,13 +822,27 @@ class TestGetChangeScope(unittest.TestCase):
         def mock_git(cmd):
             if "Complete" in cmd:
                 return ""
-            if "Ready for" in cmd and "%s" in cmd:
-                return ("[Ready for Verification features/test.md] "
+            if "Ready for" in cmd:
+                return ("2000000000 [Ready for Verification features/test.md] "
                         "[Scope: cosmetic]")
             return ""
         mock_run.side_effect = mock_git
         scope = get_change_scope("features/test.md")
         self.assertEqual(scope, "cosmetic")
+
+    @patch('serve.run_command')
+    def test_uses_most_recent_status_commit(self, mock_run):
+        """When both Complete and Ready for Verification exist, use newer."""
+        def mock_git(cmd):
+            if "Complete" in cmd:
+                return "1000000000 [Complete features/test.md]"
+            if "Ready for" in cmd:
+                return ("2000000000 [Ready for Verification features/test.md] "
+                        "[Scope: targeted:Scenario A]")
+            return ""
+        mock_run.side_effect = mock_git
+        scope = get_change_scope("features/test.md")
+        self.assertEqual(scope, "targeted:Scenario A")
 
 
 class TestApiStatusJsonChangeScope(unittest.TestCase):

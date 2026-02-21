@@ -223,23 +223,34 @@ def aggregate_test_statuses(statuses):
 def get_change_scope(f_path):
     """Extract change_scope from the most recent status commit for a feature.
 
-    Parses [Scope: <type>] from the status commit message (Complete or
-    Ready for Verification). Returns the scope string or None if absent.
+    Finds the most recent status commit (Complete or Ready for Verification),
+    then parses [Scope: <type>] from that message. Returns the scope string
+    or None if absent.
     """
-    # Try Complete commit first, then Ready for Verification
+    # Find most recent of either status commit type
+    best_ts = 0
+    best_msg = None
     for pattern in (
         f"\\[Complete {f_path}\\]",
         f"\\[Ready for .* {f_path}\\]",
     ):
-        msg = run_command(
-            f"git log -1 --grep='{pattern}' --format=%s"
+        result = run_command(
+            f"git log -1 --grep='{pattern}' --format='%ct %s'"
         )
-        if msg:
-            # Extract [Scope: ...] trailer
-            match = re.search(r'\[Scope:\s*([^\]]+)\]', msg)
-            if match:
-                return match.group(1).strip()
-            return None
+        if result:
+            parts = result.split(' ', 1)
+            try:
+                ts = int(parts[0])
+            except (ValueError, IndexError):
+                continue
+            if ts > best_ts:
+                best_ts = ts
+                best_msg = parts[1] if len(parts) > 1 else ''
+
+    if best_msg:
+        match = re.search(r'\[Scope:\s*([^\]]+)\]', best_msg)
+        if match:
+            return match.group(1).strip()
     return None
 
 
