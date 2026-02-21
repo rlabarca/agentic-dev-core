@@ -54,7 +54,7 @@ For each feature in the approved work plan, execute this protocol:
 
 ### 0. Per-Feature Pre-Flight (MANDATORY)
 Before starting work on each feature from the approved plan:
-*   **Consult the Architecture:** Read any relevant `features/arch_*.md` policies referenced by the feature's `> Prerequisite:` link.
+*   **Consult Anchor Nodes:** Read any relevant anchor node files (`features/arch_*.md`, `features/design_*.md`, `features/policy_*.md`) referenced by the feature's `> Prerequisite:` link.
 *   **Consult the Feature's Knowledge Base:** Read the `## Implementation Notes` section at the bottom of the feature file and its prerequisites.
 *   **Verify Current Status:** Confirm the target feature is in the expected state (typically `todo`) per the CDD status gathered during startup.
 
@@ -65,7 +65,7 @@ Before starting work on each feature from the approved plan:
 ### 2. Implement and Document (MANDATORY)
 *   Write the code and unit tests.
 *   **Knowledge Colocation:** If you encounter a non-obvious problem, discover critical behavior, or make a significant design decision, you MUST add a concise entry to the `## Implementation Notes` section at the bottom of the **feature file itself**.
-*   **Architectural Escalation:** If a discovery affects a global rule, you MUST update the relevant `arch_*.md` file. This ensures the "Constitution" remains accurate. Do NOT create separate log files.
+*   **Anchor Node Escalation:** If a discovery affects a global constraint, you MUST update the relevant anchor node file (`arch_*.md`, `design_*.md`, or `policy_*.md`). This ensures the project's constraints remain accurate. Do NOT create separate log files.
 *   **Commit Implementation Work:** Stage and commit all implementation code, tests, AND any feature file edits (Implementation Notes) together: `git commit -m "feat(scope): implement FEATURE_NAME"`. This commit does NOT include a status tag -- it is a work commit. The feature remains in **TODO** after this commit.
 
 ### 2b. Builder Decision Protocol (MANDATORY)

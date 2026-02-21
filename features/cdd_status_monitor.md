@@ -2,7 +2,7 @@
 
 > Label: "Tool: CDD Monitor"
 > Category: "DevOps Tools"
-> Prerequisite: features/arch_critic_policy.md
+> Prerequisite: features/policy_critic.md
 
 
 ## 1. Overview

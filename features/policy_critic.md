@@ -1,4 +1,4 @@
-# Architectural Policy: Critic Coordination Engine
+# Policy: Critic Coordination Engine
 
 > Label: "Policy: Critic Coordination Engine"
 > Category: "Coordination & Lifecycle"
@@ -49,7 +49,7 @@ The QA Agent records findings during manual verification using three discovery t
 **Constraint:** Discoveries follow a lifecycle: `OPEN -> SPEC_UPDATED -> RESOLVED -> PRUNED`. OPEN discoveries generate role-specific action items in the Critic report (BUGs route to Builder; DISCOVERYs, INTENT_DRIFTs, and SPEC_DISPUTEs route to Architect). SPEC_UPDATED discoveries generate QA re-verification items only when the feature is in TESTING lifecycle state (i.e., the Builder has committed). Builder signaling comes from the feature lifecycle: an Architect spec update resets the feature to TODO lifecycle, which gives the Builder a TODO from the lifecycle state, not from discovery routing. This ensures the CDD dashboard shows at most one role with actionable TODO per discovery step. A SPEC_DISPUTE **suspends** the disputed scenario -- QA skips it until the Architect resolves the dispute.
 
 ### 2.5 Policy Adherence
-Architectural policy files (`arch_*.md`) MAY define `FORBIDDEN:` patterns -- literal strings or regex patterns that MUST NOT appear in the implementation code of features anchored to that policy.
+Anchor node files (`arch_*.md`, `design_*.md`, `policy_*.md`) MAY define `FORBIDDEN:` patterns -- literal strings or regex patterns that MUST NOT appear in the implementation code of features anchored to that anchor node.
 
 *   The Critic tool scans implementation files for FORBIDDEN pattern violations.
 *   Any violation produces a FAIL on the Implementation Gate.
@@ -110,5 +110,5 @@ The Critic tool MUST produce:
 ## Implementation Notes
 *   This policy governs buildable tooling constraints (the Critic tool itself), not process rules. It is valid under the Feature Scope Restriction mandate.
 *   The `critic_gate_blocking` flag is deprecated as a no-op. The coordination engine model replaces blocking gates with advisory action items per role. The config key is retained for backward compatibility with existing `.agentic_devops/config.json` files.
-*   FORBIDDEN patterns are optional. Not all architectural policies need to define them.
+*   FORBIDDEN patterns are optional. Not all anchor nodes need to define them.
 *   The CDD decoupling (Invariant 2.10) means the CDD dashboard shows role-based columns (Architect, Builder, QA) derived from `role_status` in on-disk `critic.json` files. CDD does not compute these statuses; it reads pre-computed values from the Critic's output.

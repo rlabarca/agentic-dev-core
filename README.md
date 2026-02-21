@@ -14,7 +14,7 @@ By colocating technical implementation knowledge with behavioral specifications 
 
 ### 1. Spec-Driven Development
 The project's state is defined 100% by specification files:
-*   **Architectural Policies (`arch_*.md`):** Defining the "Constitution" and constraints of the system.
+*   **Anchor Nodes (`arch_*.md`, `design_*.md`, `policy_*.md`):** Defining the constraints of the system -- technical architecture, design standards, and governance policies.
 *   **Living Specifications (`*.md`):** Behavioral requirements (Gherkin) coupled with Implementation Notes (Tribal Knowledge).
 
 ### 2. Role Separation
@@ -156,10 +156,10 @@ flowchart TD
 
     subgraph Coordination_&_Lifecycle [" "]
         title_Coordination_&_Lifecycle["COORDINATION & LIFECYCLE"]
-        arch_critic_policy["Policy: Critic Coordination Engine<br/><small>arch_critic_policy.md</small>"]
-        title_Coordination_&_Lifecycle ~~~ arch_critic_policy
         critic_tool["Tool: Critic<br/><small>critic_tool.md</small>"]
         title_Coordination_&_Lifecycle ~~~ critic_tool
+        policy_critic["Policy: Critic Coordination Engine<br/><small>policy_critic.md</small>"]
+        title_Coordination_&_Lifecycle ~~~ policy_critic
     end
 
     subgraph DevOps_Tools [" "]
@@ -181,10 +181,10 @@ flowchart TD
     end
 
     %% Relationships
-    arch_critic_policy --> cdd_status_monitor
-    arch_critic_policy --> critic_tool
+    policy_critic --> cdd_status_monitor
+    policy_critic --> critic_tool
     submodule_bootstrap --> python_environment
-    arch_critic_policy --> software_map_generator
+    policy_critic --> software_map_generator
     submodule_bootstrap --> submodule_sync
 
     %% Styling Definitions

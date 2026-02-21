@@ -2,7 +2,7 @@
 
 > Label: "Tool: Critic"
 > Category: "Coordination & Lifecycle"
-> Prerequisite: features/arch_critic_policy.md
+> Prerequisite: features/policy_critic.md
 
 ## 1. Overview
 The Critic tool is the project coordination engine. It performs dual-gate validation (Spec Gate + Implementation Gate) on feature files, audits user testing status, generates role-specific action items for each agent, and produces per-feature reports and an aggregate `CRITIC_REPORT.md`. Every agent runs the Critic at session start to determine their priorities.
@@ -12,20 +12,20 @@ The Critic tool is the project coordination engine. It performs dual-gate valida
 ### 2.1 Spec Gate (Pre-Implementation Validation)
 The Spec Gate validates that a feature specification is structurally complete and properly formed. It runs without requiring any implementation code.
 
-Architectural policy files (`arch_*.md`) receive a REDUCED Spec Gate evaluation. They are checked only for section presence of Purpose and Invariants (not Overview/Requirements/Scenarios). Scenario classification and Gherkin quality checks are skipped (reported as PASS with "N/A - policy file"). Policy files also skip the Implementation Gate entirely — their `implementation_gate.status` is reported as "PASS" with detail "N/A - policy file exempt".
+Anchor node files (`arch_*.md`, `design_*.md`, `policy_*.md`) receive a REDUCED Spec Gate evaluation. They are checked only for section presence of Purpose and Invariants (not Overview/Requirements/Scenarios). Scenario classification and Gherkin quality checks are skipped (reported as PASS with "N/A - anchor node"). Anchor nodes also skip the Implementation Gate entirely — their `implementation_gate.status` is reported as "PASS" with detail "N/A - anchor node exempt".
 
 | Check | PASS | WARN | FAIL |
 |-------|------|------|------|
 | Section completeness | All required sections present (Overview, Requirements, Scenarios) | Implementation Notes empty | Missing Overview, Requirements, or Scenarios |
 | Scenario classification | Both subsections present (with content or explicit "None" declaration) | Only one subsection with no explicit opt-out for the other | No scenarios at all |
-| Policy anchoring | Has `> Prerequisite:` linking to `arch_*.md`; OR has prerequisite to non-policy file (feature is grounded) | No prerequisite (unless IS a policy file) | Referenced prerequisite file missing on disk |
+| Policy anchoring | Has `> Prerequisite:` linking to an anchor node (`arch_*.md`, `design_*.md`, `policy_*.md`); OR has prerequisite to non-anchor-node file (feature is grounded) | No prerequisite (unless IS an anchor node) | Referenced prerequisite file missing on disk |
 | Prerequisite integrity | All referenced prerequisite files exist on disk | N/A | Referenced file missing |
 | Gherkin quality | All scenarios have Given/When/Then | Some scenarios missing steps | N/A (degrades to WARN) |
 
 ### 2.2 Implementation Gate (Post-Implementation Validation)
 The Implementation Gate validates that the implementation aligns with the specification. It requires implementation code and test results to exist.
 
-> Policy files (`arch_*.md`) are exempt from the Implementation Gate. All checks report PASS with "N/A - policy file exempt".
+> Anchor node files (`arch_*.md`, `design_*.md`, `policy_*.md`) are exempt from the Implementation Gate. All checks report PASS with "N/A - anchor node exempt".
 
 | Check | PASS | WARN | FAIL |
 |-------|------|------|------|
@@ -51,7 +51,7 @@ The Implementation Gate validates that the implementation aligns with the specif
 *   **Graceful Fallback:** If `critic_llm_enabled` is `false` or the API is unavailable, the logic drift check is skipped entirely with a WARN-level note in the output. The overall Implementation Gate does not FAIL due to LLM unavailability.
 
 ### 2.5 Policy Adherence Scanner
-*   **FORBIDDEN Pattern Discovery:** Scan all `features/arch_*.md` files for lines starting with `FORBIDDEN:` followed by a pattern (literal string or regex).
+*   **FORBIDDEN Pattern Discovery:** Scan all anchor node files (`features/arch_*.md`, `features/design_*.md`, `features/policy_*.md`) for lines starting with `FORBIDDEN:` followed by a pattern (literal string or regex).
 *   **Violation Scanning:** For each feature anchored to a policy with FORBIDDEN patterns, scan the feature's implementation files for matches.
 *   **Implementation File Discovery:** Implementation files are located based on the feature's tool directory (derived from the feature file's label or explicit mapping).
 
@@ -259,12 +259,12 @@ The Critic MUST detect untracked files in the working directory and generate Arc
     And the overall spec_gate status is FAIL
 
 #### Scenario: Spec Gate Policy Anchoring
-    Given a feature file has a Prerequisite link to arch_critic_policy.md
+    Given a feature file has a Prerequisite link to policy_critic.md
     When the Critic tool runs the Spec Gate
     Then policy_anchoring reports PASS
 
-#### Scenario: Spec Gate Non-Policy Prerequisite
-    Given a feature file has a Prerequisite link to another feature file (not arch_*.md)
+#### Scenario: Spec Gate Non-Anchor-Node Prerequisite
+    Given a feature file has a Prerequisite link to another feature file (not an anchor node)
     When the Critic tool runs the Spec Gate
     Then policy_anchoring reports PASS
 
@@ -279,8 +279,8 @@ The Critic MUST detect untracked files in the working directory and generate Arc
     When the Critic tool runs the Spec Gate
     Then scenario_classification reports PASS
 
-#### Scenario: Spec Gate Policy File Is Exempt
-    Given a feature file is itself an architectural policy (arch_*.md)
+#### Scenario: Spec Gate Anchor Node Is Exempt
+    Given a feature file is itself an anchor node (arch_*.md, design_*.md, or policy_*.md)
     When the Critic tool runs the Spec Gate
     Then policy_anchoring reports PASS regardless of Prerequisite links
 
@@ -569,7 +569,7 @@ The Critic MUST detect untracked files in the working directory and generate Arc
 #### Scenario: Regression Scope Dependency Only
     Given a feature is in TESTING state
     And the most recent status commit contains [Scope: dependency-only]
-    And the feature has a prerequisite to arch_critic_policy.md
+    And the feature has a prerequisite to policy_critic.md
     When the Critic computes the regression set
     Then the regression_scope.declared is "dependency-only"
     And the regression set includes only scenarios referencing the prerequisite surface
@@ -623,16 +623,16 @@ The Critic MUST detect untracked files in the working directory and generate Arc
     Then the QA action item reads "Verify X: 2 targeted scenario(s) [Scenario A, Scenario B]"
     And scenarios not in the target list are not included in the action item
 
-#### Scenario: Spec Gate Policy File Reduced Evaluation
-    Given a feature file is an architectural policy (arch_*.md)
+#### Scenario: Spec Gate Anchor Node Reduced Evaluation
+    Given a feature file is an anchor node (arch_*.md, design_*.md, or policy_*.md)
     When the Critic tool runs the Spec Gate
     Then section_completeness checks for Purpose and Invariants instead of Overview/Requirements/Scenarios
-    And scenario_classification and gherkin_quality report PASS with "N/A - policy file"
+    And scenario_classification and gherkin_quality report PASS with "N/A - anchor node"
 
-#### Scenario: Implementation Gate Policy File Exempt
-    Given a feature file is an architectural policy (arch_*.md)
+#### Scenario: Implementation Gate Anchor Node Exempt
+    Given a feature file is an anchor node (arch_*.md, design_*.md, or policy_*.md)
     When the Critic tool runs the Implementation Gate
-    Then all checks report PASS with "N/A - policy file exempt"
+    Then all checks report PASS with "N/A - anchor node exempt"
     And the overall implementation_gate status is PASS
 
 ### Manual Scenarios (Human Verification Required)
