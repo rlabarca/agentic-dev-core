@@ -2,6 +2,19 @@
 
 This log tracks the evolution of the **Agentic DevOps Core** framework itself. This repository serves as the project-agnostic engine for Spec-Driven AI workflows.
 
+## [2026-02-21] QA Dependency-Only Skip + Visual Spec Convention Enforcement
+
+- **Problem 1 (QA over-testing on dependency-only scope):** When a feature had `dependency-only` regression scope with an empty `regression_scope.scenarios` list, the QA agent still verified all manual scenarios instead of skipping the feature. The protocol said "verify only scenarios that reference the changed prerequisite's surface area" but did not explicitly handle the empty-list case, leaving the behavior ambiguous.
+- **Problem 2 (Visual check as Gherkin scenario):** CDD Status Monitor had "Scenario: Section Heading Visual Separation" as a manual Gherkin scenario, but per HOW_WE_WORK_BASE Section 9 (Visual Specification Convention), purely visual/subjective checks belong in a `## Visual Specification` section as checklist items, not as Given/When/Then scenarios.
+- **Solution (QA Protocol):**
+    - Section 3.3: Updated `dependency-only` presentation format to show "QA skip" when the scenarios list is empty.
+    - Section 5.0: Added explicit empty-list handling -- if `regression_scope.scenarios` is empty, skip the feature entirely (same as cosmetic). Move to the next feature.
+- **Solution (CDD Spec):**
+    - Removed "Scenario: Section Heading Visual Separation" from Manual Scenarios (5 manual scenarios remain).
+    - Added `## Visual Specification` section with a "Screen: CDD Web Dashboard" subsection containing the underline separator checklist items.
+- **Files Modified:** `instructions/QA_BASE.md` (Sections 3.3, 5.0), `features/cdd_status_monitor.md` (Manual Scenarios, new Visual Specification section).
+- **Impact:** CDD spec reset to TODO. No code changes required (visual spec is Architect-owned). QA protocol clarification only -- no Builder work.
+
 ## [2026-02-20] Anchor Node Taxonomy: arch_, design_, policy_ Prefixes
 
 - **Problem:** All dependency graph anchor nodes used the single `arch_*.md` prefix regardless of domain. Visual standards (color palettes, typography, spacing) do not belong under "architectural policy," and governance rules (security baselines, compliance, coordination policies) are semantically distinct from technical constraints. The single prefix made it harder for agents and humans to quickly identify what domain a constraint file governs.

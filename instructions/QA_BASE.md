@@ -50,7 +50,7 @@ Review QA action items in `CRITIC_REPORT.md` under the `### QA` subsection. For 
     *   `full` -- "Feature X: N manual scenario(s), M visual checklist item(s) (full verification)"
     *   `targeted:A,B` -- "Feature X: 2 targeted scenario(s) [Scenario A, Scenario B]"
     *   `cosmetic` -- "Feature X: QA skip (cosmetic change) -- 0 scenarios queued"
-    *   `dependency-only` -- "Feature X: N scenario(s) touching changed dependency surface"
+    *   `dependency-only` -- If `regression_scope.scenarios` is non-empty: "Feature X: N scenario(s) touching changed dependency surface". If empty: "Feature X: QA skip (dependency-only, no scenarios in scope)"
 *   QA action items from the Critic report: features to verify, scoped scenario counts, visual verification items, and SPEC_UPDATED discoveries to re-verify.
 *   Any existing OPEN discoveries that need re-verification.
 *   Count of features with `## Visual Specification` sections (shown separately from functional scenarios).
@@ -111,7 +111,7 @@ Before starting a feature, check its regression scope:
 *   **`full`** (or missing/default) -- Verify all manual scenarios and all visual checklist items. This is the standard behavior.
 *   **`targeted:Scenario A,Scenario B`** -- Verify ONLY the named scenarios. Skip all other manual scenarios and skip visual verification unless a visual screen is explicitly named in the target list.
 *   **`cosmetic`** -- Skip the feature entirely. Inform the user: "Feature X: QA skip (cosmetic change). No scenarios queued." Move to the next feature.
-*   **`dependency-only`** -- Verify only scenarios that reference the changed prerequisite's surface area. The Critic pre-computes this set in the `regression_scope.scenarios` list.
+*   **`dependency-only`** -- Verify only scenarios listed in the Critic's `regression_scope.scenarios` array. These are the scenarios the Critic identified as touching the changed prerequisite's surface area. **If the `scenarios` list is empty**, skip the feature entirely. Inform the user: "Feature X: QA skip (dependency-only, no scenarios in scope)." Move to the next feature.
 
 If the Critic emitted a cross-validation WARNING (e.g., `cosmetic` scope but files touched by manual scenarios were modified), present the warning to the user and ask whether to proceed with the declared scope or escalate to `full`.
 
