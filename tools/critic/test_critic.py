@@ -411,6 +411,16 @@ class TestSpecGatePolicyAnchoring(unittest.TestCase):
         result = check_policy_anchoring(content, 'arch_test.md')
         self.assertEqual(result['status'], 'PASS')
 
+    def test_design_anchor_node_exempt(self):
+        content = '# Design: Test\n'
+        result = check_policy_anchoring(content, 'design_test.md')
+        self.assertEqual(result['status'], 'PASS')
+
+    def test_policy_prefix_anchor_node_exempt(self):
+        content = '# Policy: Test\n'
+        result = check_policy_anchoring(content, 'policy_critic.md')
+        self.assertEqual(result['status'], 'PASS')
+
 
 class TestSpecGatePrerequisiteIntegrity(unittest.TestCase):
     """Scenario: Spec Gate Prerequisite Integrity"""
@@ -1110,23 +1120,42 @@ class TestSpecGatePolicyFileReducedEvaluation(unittest.TestCase):
             POLICY_FILE_CONTENT, 'arch_test_policy.md', self.features_dir)
         sc_class = result['checks']['scenario_classification']
         self.assertEqual(sc_class['status'], 'PASS')
-        self.assertEqual(sc_class['detail'], 'N/A - policy file')
+        self.assertEqual(sc_class['detail'], 'N/A - anchor node')
 
     def test_policy_file_gherkin_quality_skipped(self):
         result = run_spec_gate(
             POLICY_FILE_CONTENT, 'arch_test_policy.md', self.features_dir)
         gq = result['checks']['gherkin_quality']
         self.assertEqual(gq['status'], 'PASS')
-        self.assertEqual(gq['detail'], 'N/A - policy file')
+        self.assertEqual(gq['detail'], 'N/A - anchor node')
 
     def test_policy_file_overall_passes(self):
         result = run_spec_gate(
             POLICY_FILE_CONTENT, 'arch_test_policy.md', self.features_dir)
         self.assertEqual(result['status'], 'PASS')
 
+    def test_policy_prefix_anchor_node_reduced_eval(self):
+        result = run_spec_gate(
+            POLICY_FILE_CONTENT, 'policy_critic.md', self.features_dir)
+        self.assertEqual(result['status'], 'PASS')
+        self.assertEqual(
+            result['checks']['scenario_classification']['detail'],
+            'N/A - anchor node')
+        self.assertEqual(
+            result['checks']['gherkin_quality']['detail'],
+            'N/A - anchor node')
+
+    def test_design_prefix_anchor_node_reduced_eval(self):
+        result = run_spec_gate(
+            POLICY_FILE_CONTENT, 'design_visual.md', self.features_dir)
+        self.assertEqual(result['status'], 'PASS')
+        self.assertEqual(
+            result['checks']['scenario_classification']['detail'],
+            'N/A - anchor node')
+
 
 class TestImplementationGatePolicyFileExempt(unittest.TestCase):
-    """Scenario: Implementation Gate Policy File Exempt"""
+    """Scenario: Implementation Gate Anchor Node Exempt"""
 
     def setUp(self):
         self.root = tempfile.mkdtemp()
@@ -1149,13 +1178,13 @@ class TestImplementationGatePolicyFileExempt(unittest.TestCase):
         for check_name, check_result in gate['checks'].items():
             self.assertEqual(
                 check_result['status'], 'PASS',
-                f'{check_name} should be PASS for policy file')
+                f'{check_name} should be PASS for anchor node')
 
     def test_exempt_gate_detail_says_exempt(self):
         gate = _policy_exempt_implementation_gate()
         for check_name, check_result in gate['checks'].items():
             self.assertIn(
-                'N/A - policy file exempt', check_result['detail'],
+                'N/A - anchor node exempt', check_result['detail'],
                 f'{check_name} detail should say exempt')
 
     def test_generate_critic_json_uses_exempt_for_policy(self):

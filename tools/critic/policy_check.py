@@ -1,17 +1,23 @@
 """Policy adherence scanner: FORBIDDEN pattern detection.
 
-Discovers FORBIDDEN patterns from architectural policy files (arch_*.md)
-and scans implementation files for violations.
+Discovers FORBIDDEN patterns from anchor node files (arch_*.md, design_*.md,
+policy_*.md) and scans implementation files for violations.
 """
 
 import os
 import re
 
 
-def discover_forbidden_patterns(features_dir):
-    """Scan arch_*.md files for FORBIDDEN: lines.
+def _is_anchor_node(fname):
+    """Check if a filename is an anchor node (arch_*, design_*, policy_*)."""
+    return (fname.startswith('arch_') or fname.startswith('design_')
+            or fname.startswith('policy_'))
 
-    Returns dict: {policy_file: [{"pattern": str, "line": int}]}
+
+def discover_forbidden_patterns(features_dir):
+    """Scan anchor node files for FORBIDDEN: lines.
+
+    Returns dict: {anchor_file: [{"pattern": str, "line": int}]}
     """
     patterns = {}
 
@@ -19,7 +25,7 @@ def discover_forbidden_patterns(features_dir):
         return patterns
 
     for fname in sorted(os.listdir(features_dir)):
-        if not (fname.startswith('arch_') and fname.endswith('.md')):
+        if not (_is_anchor_node(fname) and fname.endswith('.md')):
             continue
 
         filepath = os.path.join(features_dir, fname)
@@ -52,21 +58,24 @@ def discover_forbidden_patterns(features_dir):
 
 
 def get_feature_prerequisites(feature_content):
-    """Extract prerequisite references from feature file content.
+    """Extract anchor node prerequisite references from feature file content.
 
-    Returns list of referenced filenames (e.g., ['arch_critic_policy.md']).
+    Returns list of referenced anchor node filenames
+    (e.g., ['arch_critic_policy.md', 'policy_critic.md']).
     """
     prereqs = []
+    anchor_pattern = r'(?:arch_|design_|policy_)\w+\.md'
     for line in feature_content.split('\n'):
         stripped = line.strip()
         if stripped.startswith('> Prerequisite:'):
-            # Extract filename references
             text = stripped[len('> Prerequisite:'):].strip()
-            # Match arch_*.md patterns
-            matches = re.findall(r'(arch_\w+\.md)', text)
-            prereqs.extend(matches)
-            # Also match features/arch_*.md patterns
-            matches = re.findall(r'features/(arch_\w+\.md)', text)
+            # Match anchor node filenames directly
+            matches = re.findall(r'(' + anchor_pattern + r')', text)
+            for m in matches:
+                if m not in prereqs:
+                    prereqs.append(m)
+            # Also match features/<anchor>.md patterns
+            matches = re.findall(r'features/(' + anchor_pattern + r')', text)
             for m in matches:
                 if m not in prereqs:
                     prereqs.append(m)

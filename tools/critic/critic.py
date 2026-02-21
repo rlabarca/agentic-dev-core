@@ -248,8 +248,10 @@ def parse_visual_spec(content):
 
 
 def is_policy_file(filename):
-    """Check if a filename is an architectural policy file."""
-    return os.path.basename(filename).startswith('arch_')
+    """Check if a filename is an anchor node (arch_*.md, design_*.md, policy_*.md)."""
+    base = os.path.basename(filename)
+    return (base.startswith('arch_') or base.startswith('design_')
+            or base.startswith('policy_'))
 
 
 def get_feature_stem(filepath):
@@ -264,8 +266,8 @@ def get_feature_stem(filepath):
 def check_section_completeness(content, sections, policy_file=False):
     """Check that required sections exist.
 
-    For policy files (arch_*.md), checks for Purpose and Invariants
-    instead of Overview/Requirements/Scenarios.
+    For anchor nodes (arch_*.md, design_*.md, policy_*.md), checks for
+    Purpose and Invariants instead of Overview/Requirements/Scenarios.
     """
     if policy_file:
         has_purpose = any('purpose' in k for k in sections)
@@ -373,11 +375,11 @@ def _has_explicit_none_automated(content):
 
 
 def check_policy_anchoring(content, filename):
-    """Check that the feature has a Prerequisite link to arch_*.md or other feature."""
+    """Check that the feature has a Prerequisite link to an anchor node or other feature."""
     if is_policy_file(filename):
         return {
             'status': 'PASS',
-            'detail': 'Policy file is exempt from prerequisite requirement.',
+            'detail': 'Anchor node is exempt from prerequisite requirement.',
         }
 
     prereqs = get_feature_prerequisites(content)
@@ -483,8 +485,9 @@ def check_gherkin_quality(scenarios):
 def run_spec_gate(content, filename, features_dir):
     """Run all Spec Gate checks.
 
-    Policy files (arch_*.md) receive reduced evaluation: only Purpose/Invariants
-    section check; scenario_classification and gherkin_quality are skipped.
+    Anchor nodes (arch_*.md, design_*.md, policy_*.md) receive reduced
+    evaluation: only Purpose/Invariants section check;
+    scenario_classification and gherkin_quality are skipped.
     """
     sections = parse_sections(content)
     scenarios = parse_scenarios(content)
@@ -495,12 +498,12 @@ def run_spec_gate(content, filename, features_dir):
             'section_completeness': check_section_completeness(
                 content, sections, policy_file=True),
             'scenario_classification': {
-                'status': 'PASS', 'detail': 'N/A - policy file'},
+                'status': 'PASS', 'detail': 'N/A - anchor node'},
             'policy_anchoring': check_policy_anchoring(content, filename),
             'prerequisite_integrity': check_prerequisite_integrity(
                 content, features_dir),
             'gherkin_quality': {
-                'status': 'PASS', 'detail': 'N/A - policy file'},
+                'status': 'PASS', 'detail': 'N/A - anchor node'},
         }
     else:
         checks = {
@@ -1402,8 +1405,8 @@ def compute_role_status(feature_result, cdd_status=None):
 # ===================================================================
 
 def _policy_exempt_implementation_gate():
-    """Return an Implementation Gate result for policy files (all PASS)."""
-    exempt = 'N/A - policy file exempt'
+    """Return an Implementation Gate result for anchor nodes (all PASS)."""
+    exempt = 'N/A - anchor node exempt'
     return {
         'status': 'PASS',
         'checks': {
