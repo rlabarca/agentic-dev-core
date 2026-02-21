@@ -228,6 +228,25 @@ def parse_discovery_entries(section_text):
     return entries
 
 
+def parse_visual_spec(content):
+    """Detect and parse a Visual Specification section.
+
+    Returns dict: {'present': bool, 'screens': int, 'items': int}
+    """
+    match = re.search(
+        r'^##\s+Visual\s+Specification\s*$(.*?)(?=^##\s|\Z)',
+        content, re.MULTILINE | re.DOTALL
+    )
+    if not match:
+        return {'present': False, 'screens': 0, 'items': 0}
+
+    section_text = match.group(1)
+    screens = len(re.findall(r'^###\s+Screen:', section_text, re.MULTILINE))
+    items = len(re.findall(r'^-\s+\[[ x]\]', section_text, re.MULTILINE))
+
+    return {'present': True, 'screens': screens, 'items': items}
+
+
 def is_policy_file(filename):
     """Check if a filename is an architectural policy file."""
     return os.path.basename(filename).startswith('arch_')
@@ -925,7 +944,11 @@ def generate_action_items(feature_result, cdd_status=None):
     # See spec Section 2.10 "SPEC_UPDATED Lifecycle Routing".
 
     # --- QA items ---
-    # Features in TESTING status (from CDD) -> MEDIUM
+    # Features in TESTING status (from CDD) -> MEDIUM (scope-aware)
+    regression_scope = feature_result.get('regression_scope', {})
+    visual_spec = feature_result.get('visual_spec', {})
+    declared_scope = regression_scope.get('declared', 'full')
+
     if cdd_status is not None:
         testing_features = cdd_status.get('features', {}).get('testing', [])
         for tf in testing_features:
@@ -939,16 +962,77 @@ def generate_action_items(feature_result, cdd_status=None):
                 scenarios = parse_scenarios(content)
                 manual_count = sum(
                     1 for s in scenarios if s.get('is_manual', False))
-                if manual_count > 0:
+
+                # Generate scope-aware QA action items
+                if declared_scope == 'cosmetic':
+                    qa_items.append({
+                        'priority': 'MEDIUM',
+                        'category': 'testing_status',
+                        'feature': feature_name,
+                        'description': (
+                            f'QA skip (cosmetic change) -- '
+                            f'0 scenarios queued'
+                        ),
+                    })
+                elif declared_scope.startswith('targeted:'):
+                    targeted = regression_scope.get('scenarios', [])
+                    names = ', '.join(targeted)
                     qa_items.append({
                         'priority': 'MEDIUM',
                         'category': 'testing_status',
                         'feature': feature_name,
                         'description': (
                             f'Verify {feature_name}: '
-                            f'{manual_count} manual scenario(s)'
+                            f'{len(targeted)} targeted scenario(s) '
+                            f'[{names}]'
                         ),
                     })
+                elif declared_scope == 'dependency-only':
+                    dep_count = len(regression_scope.get('scenarios', []))
+                    qa_items.append({
+                        'priority': 'MEDIUM',
+                        'category': 'testing_status',
+                        'feature': feature_name,
+                        'description': (
+                            f'Verify {feature_name}: '
+                            f'{dep_count} scenario(s) touching '
+                            f'changed dependency surface'
+                        ),
+                    })
+                elif manual_count > 0:
+                    # 'full' scope (default)
+                    vis_items = visual_spec.get('items', 0)
+                    desc = (
+                        f'Verify {feature_name}: '
+                        f'{manual_count} manual scenario(s)'
+                    )
+                    if vis_items > 0:
+                        desc += f', {vis_items} visual item(s)'
+                    qa_items.append({
+                        'priority': 'MEDIUM',
+                        'category': 'testing_status',
+                        'feature': feature_name,
+                        'description': desc,
+                    })
+
+                # Visual verification as a separate QA action item
+                if visual_spec.get('present') and declared_scope not in (
+                        'cosmetic',) and not declared_scope.startswith(
+                        'targeted:'):
+                    vis_screens = visual_spec.get('screens', 0)
+                    vis_items = visual_spec.get('items', 0)
+                    if vis_items > 0:
+                        qa_items.append({
+                            'priority': 'MEDIUM',
+                            'category': 'visual_verification',
+                            'feature': feature_name,
+                            'description': (
+                                f'Visual verify {feature_name}: '
+                                f'{vis_items} checklist item(s) across '
+                                f'{vis_screens} screen(s)'
+                            ),
+                        })
+
                 break
 
     # SPEC_UPDATED discoveries -> MEDIUM QA (only when feature is in TESTING)
@@ -1025,6 +1109,136 @@ def audit_untracked_files(project_root=None):
         })
 
     return items
+
+
+# ===================================================================
+# Regression Scope Computation (Section 2.12)
+# ===================================================================
+
+def _extract_scope_from_commit(feature_file, project_root=None):
+    """Extract [Scope: ...] from the most recent status commit for a feature.
+
+    Returns the declared scope string (e.g. 'full', 'targeted:A,B', 'cosmetic',
+    'dependency-only') or 'full' if no scope trailer is found.
+    """
+    root = project_root or PROJECT_ROOT
+    basename = os.path.basename(feature_file)
+    try:
+        result = subprocess.run(
+            ['git', 'log', '--all', '--grep', basename,
+             '--format=%s', '-n', '1'],
+            cwd=root, capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return 'full'
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return 'full'
+
+    msg = result.stdout.strip().split('\n')[0]
+    scope_match = re.search(r'\[Scope:\s*([^\]]+)\]', msg)
+    if scope_match:
+        return scope_match.group(1).strip()
+    return 'full'
+
+
+def _get_commit_changed_files(feature_file, project_root=None):
+    """Get files modified by the most recent status commit for a feature.
+
+    Returns set of file paths (relative to project root).
+    """
+    root = project_root or PROJECT_ROOT
+    basename = os.path.basename(feature_file)
+    try:
+        # Find the commit hash
+        result = subprocess.run(
+            ['git', 'log', '--all', '--grep', basename,
+             '--format=%H', '-n', '1'],
+            cwd=root, capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return set()
+
+        commit_hash = result.stdout.strip().split('\n')[0]
+
+        # Get changed files in that commit
+        diff_result = subprocess.run(
+            ['git', 'diff-tree', '--no-commit-id', '--name-only', '-r',
+             commit_hash],
+            cwd=root, capture_output=True, text=True, timeout=10,
+        )
+        if diff_result.returncode != 0:
+            return set()
+
+        return {f.strip() for f in diff_result.stdout.strip().split('\n')
+                if f.strip()}
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return set()
+
+
+def compute_regression_set(feature_file, content, cdd_status=None,
+                           project_root=None):
+    """Compute the regression set for a feature based on declared scope.
+
+    Returns dict: {
+        'declared': str,
+        'scenarios': [str, ...],
+        'visual_items': int,
+        'cross_validation_warnings': [str, ...]
+    }
+    """
+    root = project_root or PROJECT_ROOT
+    declared = _extract_scope_from_commit(feature_file, root)
+
+    scenarios = parse_scenarios(content)
+    manual_titles = [s['title'] for s in scenarios if s.get('is_manual')]
+    visual = parse_visual_spec(content)
+    warnings = []
+
+    if declared == 'cosmetic':
+        # Cross-validate: check if commit modified files referenced by manual
+        # scenarios -- if so, emit a warning
+        changed_files = _get_commit_changed_files(feature_file, root)
+        if changed_files:
+            warnings.append(
+                f'Cosmetic scope commit modifies files: '
+                f'{", ".join(sorted(changed_files))}. '
+                f'Manual scenarios may be affected.'
+            )
+        return {
+            'declared': 'cosmetic',
+            'scenarios': [],
+            'visual_items': 0,
+            'cross_validation_warnings': warnings,
+        }
+
+    if declared.startswith('targeted:'):
+        targeted_names = [
+            n.strip() for n in declared[len('targeted:'):].split(',')
+        ]
+        return {
+            'declared': declared,
+            'scenarios': targeted_names,
+            'visual_items': 0,  # visual skipped unless explicitly targeted
+            'cross_validation_warnings': warnings,
+        }
+
+    if declared == 'dependency-only':
+        # Include scenarios referencing the changed prerequisite surface.
+        # For now, include all manual scenarios as a conservative default.
+        return {
+            'declared': 'dependency-only',
+            'scenarios': manual_titles,
+            'visual_items': visual['items'] if visual['present'] else 0,
+            'cross_validation_warnings': warnings,
+        }
+
+    # 'full' (default)
+    return {
+        'declared': 'full',
+        'scenarios': manual_titles,
+        'visual_items': visual['items'] if visual['present'] else 0,
+        'cross_validation_warnings': warnings,
+    }
 
 
 # ===================================================================
@@ -1232,15 +1446,33 @@ def generate_critic_json(feature_path, cdd_status=None):
 
     rel_path = os.path.relpath(feature_path, PROJECT_ROOT)
 
+    # Visual spec detection (Section 2.13)
+    visual_spec = parse_visual_spec(content)
+
+    # Regression scope computation (Section 2.12)
+    lifecycle_state = _get_feature_lifecycle_state(rel_path, cdd_status)
+    if lifecycle_state == 'testing':
+        regression_scope = compute_regression_set(
+            rel_path, content, cdd_status)
+    else:
+        regression_scope = {
+            'declared': 'full',
+            'scenarios': [],
+            'visual_items': 0,
+            'cross_validation_warnings': [],
+        }
+
     result = {
         'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'feature_file': rel_path,
         'spec_gate': spec_gate,
         'implementation_gate': impl_gate,
         'user_testing': user_testing,
+        'visual_spec': visual_spec,
+        'regression_scope': regression_scope,
     }
 
-    # Generate action items
+    # Generate action items (pass visual_spec and regression_scope)
     result['action_items'] = generate_action_items(result, cdd_status)
 
     # Compute role status (depends on action_items being populated)

@@ -57,6 +57,9 @@ from critic import (
     audit_untracked_files,
     compute_role_status,
     parse_builder_decisions,
+    parse_visual_spec,
+    compute_regression_set,
+    _extract_scope_from_commit,
 )
 import logic_drift
 
@@ -3036,6 +3039,357 @@ Reqs.
             self.assertEqual(status['qa'], 'CLEAN')
         finally:
             critic.FEATURES_DIR = orig_features
+
+
+# ===================================================================
+# Regression Scope Tests (Section 2.12)
+# ===================================================================
+
+class TestRegressionScopeFullDefault(unittest.TestCase):
+    """Scenario: Regression Scope Full Default
+
+    When no [Scope: ...] trailer exists, declared defaults to 'full' and
+    the regression set includes all manual scenarios and visual items.
+    """
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.features_dir = os.path.join(self.root, 'features')
+        os.makedirs(self.features_dir)
+        self.content = """\
+# Feature: Scope Test
+
+## 1. Overview
+Overview.
+
+## 2. Requirements
+Reqs.
+
+## 3. Scenarios
+
+### Automated Scenarios
+
+#### Scenario: Auto Test
+    Given X
+    When Y
+    Then Z
+
+### Manual Scenarios (Human Verification Required)
+
+#### Scenario: Manual Check A
+    Given A
+    When B
+    Then C
+
+#### Scenario: Manual Check B
+    Given D
+    When E
+    Then F
+
+## Visual Specification
+
+### Screen: Dashboard
+- [ ] Check layout
+- [ ] Check colors
+
+## 4. Implementation Notes
+* Note.
+"""
+        with open(os.path.join(self.features_dir, 'scope_test.md'), 'w') as f:
+            f.write(self.content)
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    @patch('critic._extract_scope_from_commit', return_value='full')
+    def test_full_default_includes_all(self, _mock):
+        result = compute_regression_set(
+            'features/scope_test.md', self.content)
+        self.assertEqual(result['declared'], 'full')
+        self.assertIn('Manual Check A', result['scenarios'])
+        self.assertIn('Manual Check B', result['scenarios'])
+        self.assertEqual(result['visual_items'], 2)
+        self.assertEqual(result['cross_validation_warnings'], [])
+
+
+class TestRegressionScopeTargeted(unittest.TestCase):
+    """Scenario: Regression Scope Targeted
+
+    [Scope: targeted:Web Dashboard Display,Role Columns on Dashboard]
+    yields only the named scenarios; visual is skipped.
+    """
+
+    def setUp(self):
+        self.content = """\
+# Feature: Targeted
+
+## 3. Scenarios
+
+### Manual Scenarios (Human Verification Required)
+
+#### Scenario: Web Dashboard Display
+    Given X When Y Then Z
+
+#### Scenario: Role Columns on Dashboard
+    Given A When B Then C
+
+#### Scenario: Other Scenario
+    Given D When E Then F
+
+## Visual Specification
+
+### Screen: Page
+- [ ] Check item
+
+## Implementation Notes
+* Note.
+"""
+
+    @patch('critic._extract_scope_from_commit',
+           return_value='targeted:Web Dashboard Display,Role Columns on Dashboard')
+    def test_targeted_scope(self, _mock):
+        result = compute_regression_set(
+            'features/targeted.md', self.content)
+        self.assertEqual(
+            result['declared'],
+            'targeted:Web Dashboard Display,Role Columns on Dashboard')
+        self.assertEqual(
+            sorted(result['scenarios']),
+            ['Role Columns on Dashboard', 'Web Dashboard Display'])
+        # Visual skipped for targeted
+        self.assertEqual(result['visual_items'], 0)
+
+
+class TestRegressionScopeCosmetic(unittest.TestCase):
+    """Scenario: Regression Scope Cosmetic
+
+    [Scope: cosmetic] yields empty regression set.
+    """
+
+    def setUp(self):
+        self.content = """\
+# Feature: Cosmetic
+
+## 3. Scenarios
+
+### Manual Scenarios (Human Verification Required)
+
+#### Scenario: Some Manual
+    Given X When Y Then Z
+
+## Implementation Notes
+* Note.
+"""
+
+    @patch('critic._extract_scope_from_commit', return_value='cosmetic')
+    @patch('critic._get_commit_changed_files', return_value=set())
+    def test_cosmetic_empty_set(self, _mock_files, _mock_scope):
+        result = compute_regression_set(
+            'features/cosmetic.md', self.content)
+        self.assertEqual(result['declared'], 'cosmetic')
+        self.assertEqual(result['scenarios'], [])
+        self.assertEqual(result['visual_items'], 0)
+
+    @patch('critic._extract_scope_from_commit', return_value='cosmetic')
+    @patch('critic._get_commit_changed_files',
+           return_value={'tools/cdd/server.py'})
+    def test_cosmetic_cross_validation_warning(self, _mock_files, _mock_scope):
+        """Cross-validation: cosmetic scope with changed files emits warning."""
+        result = compute_regression_set(
+            'features/cosmetic.md', self.content)
+        self.assertEqual(result['declared'], 'cosmetic')
+        self.assertEqual(len(result['cross_validation_warnings']), 1)
+        self.assertIn('Cosmetic scope',
+                      result['cross_validation_warnings'][0])
+
+
+class TestRegressionScopeDependencyOnly(unittest.TestCase):
+    """Scenario: Regression Scope Dependency Only
+
+    [Scope: dependency-only] includes scenarios touching changed dependency.
+    """
+
+    def setUp(self):
+        self.content = """\
+# Feature: Dep Only
+
+> Prerequisite: features/arch_critic_policy.md
+
+## 3. Scenarios
+
+### Manual Scenarios (Human Verification Required)
+
+#### Scenario: Dep Surface A
+    Given X When Y Then Z
+
+#### Scenario: Dep Surface B
+    Given A When B Then C
+
+## Implementation Notes
+* Note.
+"""
+
+    @patch('critic._extract_scope_from_commit',
+           return_value='dependency-only')
+    def test_dependency_only_scope(self, _mock):
+        result = compute_regression_set(
+            'features/dep_only.md', self.content)
+        self.assertEqual(result['declared'], 'dependency-only')
+        # Conservative default: includes all manual scenarios
+        self.assertIn('Dep Surface A', result['scenarios'])
+        self.assertIn('Dep Surface B', result['scenarios'])
+
+
+class TestRegressionScopeCrossValidationWarning(unittest.TestCase):
+    """Scenario: Regression Scope Cross-Validation Warning
+
+    Cosmetic scope + modified files triggers a cross-validation warning
+    in both regression_scope.cross_validation_warnings and the report.
+    """
+
+    def setUp(self):
+        self.content = """\
+# Feature: Cross Val
+
+## 3. Scenarios
+
+### Manual Scenarios (Human Verification Required)
+
+#### Scenario: Manual Test
+    Given X When Y Then Z
+
+## Implementation Notes
+* Note.
+"""
+
+    @patch('critic._extract_scope_from_commit', return_value='cosmetic')
+    @patch('critic._get_commit_changed_files',
+           return_value={'tools/cdd/server.py', 'tools/cdd/templates/index.html'})
+    def test_cross_validation_warning_emitted(self, _mock_files, _mock_scope):
+        result = compute_regression_set(
+            'features/cross_val.md', self.content)
+        self.assertTrue(len(result['cross_validation_warnings']) > 0)
+        warning = result['cross_validation_warnings'][0]
+        self.assertIn('Cosmetic scope', warning)
+        self.assertIn('tools/cdd/server.py', warning)
+
+
+# ===================================================================
+# Visual Specification Tests (Section 2.13)
+# ===================================================================
+
+class TestVisualSpecificationDetected(unittest.TestCase):
+    """Scenario: Visual Specification Detected
+
+    Feature with ## Visual Specification section reports screens and items.
+    """
+
+    def test_visual_spec_detected(self):
+        content = """\
+# Feature: Visual
+
+## 1. Overview
+Overview.
+
+## Visual Specification
+
+### Screen: Dashboard
+- [ ] Layout is responsive
+- [ ] Colors match brand
+- [x] Logo is visible
+
+### Screen: Settings
+- [ ] Toggle switches align
+- [ ] Font sizes correct
+- [ ] Spacing consistent
+- [ ] Dark mode supported
+- [ ] Scrollbar visible
+
+## Implementation Notes
+* Note.
+"""
+        result = parse_visual_spec(content)
+        self.assertTrue(result['present'])
+        self.assertEqual(result['screens'], 2)
+        self.assertEqual(result['items'], 8)
+
+    def test_visual_spec_not_present(self):
+        content = """\
+# Feature: No Visual
+
+## 1. Overview
+Overview.
+
+## Implementation Notes
+* Note.
+"""
+        result = parse_visual_spec(content)
+        self.assertFalse(result['present'])
+        self.assertEqual(result['screens'], 0)
+        self.assertEqual(result['items'], 0)
+
+
+class TestVisualSpecificationExemptFromTraceability(unittest.TestCase):
+    """Scenario: Visual Specification Exempt from Traceability
+
+    Visual checklist items do not affect traceability coverage.
+    The traceability engine only processes scenarios parsed by
+    parse_scenarios(), which does not extract visual spec items.
+    """
+
+    def test_visual_items_not_parsed_as_scenarios(self):
+        """Visual spec items are not returned by parse_scenarios()."""
+        content = """\
+# Feature: Visual Trace
+
+## 3. Scenarios
+
+### Automated Scenarios
+
+#### Scenario: Auto Test
+    Given X
+    When Y
+    Then Z
+
+## Visual Specification
+
+### Screen: Dashboard
+- [ ] Check layout
+- [ ] Check colors
+"""
+        scenarios = parse_scenarios(content)
+        # Only the automated scenario is parsed, not visual items
+        self.assertEqual(len(scenarios), 1)
+        self.assertEqual(scenarios[0]['title'], 'Auto Test')
+
+    def test_visual_items_excluded_from_traceability(self):
+        """Visual items don't produce traceability gaps."""
+        content = """\
+# Feature: Visual Trace
+
+## 3. Scenarios
+
+### Automated Scenarios
+
+#### Scenario: Auto Test
+    Given X
+    When Y
+    Then Z
+
+## Visual Specification
+
+### Screen: Dashboard
+- [ ] Check layout
+- [ ] Check colors
+"""
+        scenarios = parse_scenarios(content)
+        # Traceability only considers automated scenarios
+        automated = [s for s in scenarios if not s.get('is_manual')]
+        self.assertEqual(len(automated), 1)
+        # Visual items are not in the scenario list at all
+        titles = [s['title'] for s in scenarios]
+        self.assertNotIn('Check layout', titles)
+        self.assertNotIn('Check colors', titles)
 
 
 # ===================================================================
